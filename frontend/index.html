@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Design Automation</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
+    <link rel="stylesheet" href="css/style.css?v=20260313k">
+</head>
+
+<body>
+    <!-- Landing Page -->
+    <div id="landingPage" class="landing-page">
+        <div class="landing-container">
+            <header class="landing-header">
+                <div class="logo">
+                    <h1>Website Design Automation</h1>
+                </div>
+            </header>
+
+            <main class="landing-main">
+                <div class="hero-section">
+                    <h1 class="hero-title">Turn your ideas into<br><span class="highlight">professional sitemaps</span>
+                    </h1>
+                    <p class="hero-subtitle">Describe your website in plain English and watch as we generate a complete
+                        sitemap structure with interactive editing capabilities.</p>
+
+                    <div class="prompt-wrapper">
+                        <div class="prompt-input-container">
+                            <input type="text" id="promptInput" placeholder="marketing website 5 page"
+                                class="prompt-input" />
+                            <button id="generateBtn" class="generate-btn">
+                                Generate
+                            </button>
+                        </div>
+
+                        <div class="example-suggestion">
+                            <span>Take it for a spin with an </span>
+                            <button class="example-link" data-prompt="Create a 5-page law firm website">example</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Editor Page -->
+    <div id="editorPage" class="app-container" style="display: none;">
+        <!-- Top Navigation -->
+        <header class="top-nav">
+            <div class="nav-left">
+                <button id="backBtn" class="back-button">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                    Back
+                </button>
+                <div class="project-info">
+                    <div class="project-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        </svg>
+                    </div>
+                    <span id="projectTitle">Website Design Automation</span>
+                </div>
+            </div>
+
+            <div class="nav-center">
+                <div class="tab-navigation">
+                    <button class="tab-btn active" data-tab="sitemap">Sitemap</button>
+                    <button class="tab-btn" data-tab="wireframe">Wireframe</button>
+                </div>
+            </div>
+
+            <div class="nav-right">
+                <button id="fitToggleBtn" class="btn btn-secondary">Actual Size</button>
+                <button id="shareBtn" class="btn btn-secondary">Share</button>
+                <button id="copySitemapBtn" class="btn btn-secondary" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy Sitemap
+                </button>
+                <button id="exportBtn" class="btn btn-secondary" disabled>Export</button>
+                <button id="newProjectBtn" class="btn btn-primary">New Project</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="main-workspace">
+            <!-- Sitemap Canvas -->
+            <div class="sitemap-canvas">
+                <div id="sitemapContainer" class="sitemap-container">
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1">
+                                <path
+                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            </svg>
+                        </div>
+                        <h3>Loading sitemap...</h3>
+                        <p>Please wait while we generate your sitemap</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Wireframe Tab Content -->
+                <div id="wireframeTab" class="sidebar-tab" style="display: none;">
+                    <div class="sidebar-header">
+                        <h3>Wireframes</h3>
+                        <button id="generateWireframeBtn" class="btn btn-primary btn-small" disabled>
+                            Generate AI Wireframes
+                        </button>
+                    </div>
+                    <div id="wireframeContent" class="wireframe-content">
+                        <div class="empty-state-small">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <line x1="9" y1="9" x2="15" y2="9" />
+                                <line x1="9" y1="12" x2="15" y2="12" />
+                                <line x1="9" y1="15" x2="15" y2="15" />
+                            </svg>
+                            <p>Generate wireframes from your sitemap</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JSON Output Tab -->
+                <div class="sidebar-tab">
+                    <div class="sidebar-header">
+                        <h3>JSON Output</h3>
+                        <button id="copyJsonBtn" class="copy-btn" disabled>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                    <div class="json-container">
+                        <pre id="jsonOutput" class="json-output">
+{
+  "website_type": "",
+  "pages": []
+}
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span class="status-text">Ready</span>
+            </div>
+            <div class="status-right">
+                <div class="project-stats">
+                    <span id="pageCount">0 pages</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Generating sitemap...</p>
+    </div>
+
+    <script src="js/state-manager.js?v=20260115-v2"></script>
+    <script src="js/wireframe-editor.js?v=20260115-v2"></script>
+    <script src="js/app.js?v=20260317a"></script>
+</body>
+
+</html>

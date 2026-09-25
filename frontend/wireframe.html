@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireframe V10 - Debugging</title>
+    <link rel="stylesheet" href="css/style.css?v=20260115-v10">
+    <link rel="stylesheet" href="css/wireframe.css?v=20260115-v10">
+    <link rel="stylesheet" href="css/relume-sidebar.css?v=20260115-v10">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Tiro+Devanagari+Hindi:ital@0;1&family=Abril+Fatface&family=Playfair+Display:wght@400;600;700&family=Merriweather:wght@400;700&family=Lora:wght@400;600&family=Roboto+Slab:wght@400;600&family=Open+Sans:wght@400;600&family=Source+Sans+3:wght@400;600&family=Nunito:wght@400;700&family=Montserrat:wght@400;600&display=swap"
+        rel="stylesheet">
+    <!-- JSZip library for creating ZIP files -->
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+
+</head>
+
+<body>
+    <div class="wireframe-app">
+        <!-- Top Navigation -->
+        <header class="top-nav">
+            <div class="nav-left">
+                <button id="backToSitemapBtn" class="back-button">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                    Back to Sitemap
+                </button>
+                <div class="project-info">
+                    <div class="project-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="9" y1="9" x2="15" y2="9" />
+                            <line x1="9" y1="12" x2="15" y2="12" />
+                            <line x1="9" y1="15" x2="15" y2="15" />
+                        </svg>
+                    </div>
+                    <span id="wireframeProjectTitle">Website Design Automation</span>
+                </div>
+            </div>
+
+            <div class="nav-center">
+                <div class="tab-navigation">
+                    <button class="tab-btn" data-tab="sitemap">Sitemap</button>
+                    <button class="tab-btn active" data-tab="wireframe">Wireframe</button>
+                </div>
+            </div>
+
+            <div class="nav-right">
+                <div class="export-dropdown-container" style="position: relative; display: inline-block;">
+
+                    <button id="exportPageBtn" class="btn btn-secondary">
+                        Export Page
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-left: 4px;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <!-- Format Selection Dropdown -->
+                    <div id="exportDropdown" class="export-dropdown" style="display: none;">
+                        <div class="export-option" data-format="wp-elementor">
+                            <div class="export-icon wp-elementor-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#0085E0" stroke="black"
+                                        stroke-width="1.5" />
+                                </svg>
+                            </div>
+                            <span class="export-text">WP Elementor</span>
+                        </div>
+                        <div class="export-option" data-format="webflow">
+                            <div class="export-icon webflow-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 -12 2Z"
+                                        fill="#eeeeee" />
+                                    <path d="M6 14C6.5 13 8 9 12 9C16 9 17.5 13 18 14" stroke="#00A2FF"
+                                        stroke-width="2.5" stroke-linecap="round" />
+                                    <path d="M8 16C8.5 15 10 12 12 12C14 12 15.5 15 16 16" stroke="#00A2FF"
+                                        stroke-width="2" stroke-linecap="round" />
+                                </svg>
+                            </div>
+                            <span class="export-text">Webflow</span>
+                        </div>
+                        <div class="export-option" data-format="react">
+                            <div class="export-icon react-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <rect width="24" height="24" rx="4" fill="#61DAFB" fill-opacity="0.2" />
+                                    <circle cx="12" cy="12" r="2" fill="#61DAFB" />
+                                    <ellipse cx="12" cy="12" rx="8" ry="3" stroke="#61DAFB" stroke-width="1.5" />
+                                    <ellipse cx="12" cy="12" rx="8" ry="3" stroke="#61DAFB" stroke-width="1.5"
+                                        transform="rotate(60 12 12)" />
+                                    <ellipse cx="12" cy="12" rx="8" ry="3" stroke="#61DAFB" stroke-width="1.5"
+                                        transform="rotate(120 12 12)" />
+                                </svg>
+                            </div>
+                            <span class="export-text">React & Tailwind</span>
+                        </div>
+                        <div class="export-option" data-format="html-css">
+                            <div class="export-icon html-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M4 4V20H20V8L16 4H4Z" stroke="#334155" stroke-width="2"
+                                        stroke-linejoin="round" />
+                                    <path d="M16 4V8H20" stroke="#334155" stroke-width="2" stroke-linejoin="round" />
+                                    <path d="M8 12H16" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" />
+                                    <path d="M8 15H16" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" />
+                                </svg>
+                            </div>
+                            <span class="export-text">HTML & CSS</span>
+                        </div>
+                        <div class="export-option" data-format="figma">
+                            <div class="export-icon figma-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                                        fill="#F2F2F2" />
+                                    <circle cx="8" cy="8" r="3" fill="#F24E1E" />
+                                    <circle cx="12" cy="8" r="3" fill="#FF7262" />
+                                    <circle cx="16" cy="8" r="3" fill="#A259FF" />
+                                    <circle cx="8" cy="12" r="3" fill="#1ABCFE" />
+                                    <circle cx="12" cy="12" r="3" fill="#0ACF83" />
+                                </svg>
+                            </div>
+                            <span class="export-text">Figma</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="exportAllBtn" class="btn btn-secondary">Export All</button>
+                <button id="generateAllBtn" class="btn btn-primary">Generate All</button>
+                <div class="view-controls" style="margin-left:12px;">
+                    <div class="view-control">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="6" width="18" height="12" rx="2"></rect>
+                        </svg>
+                        <select id="screenSizeSelect" class="control-select">
+                            <option value="desktop">Desktop</option>
+                            <option value="tablet">Tablet</option>
+                            <option value="mobile">Mobile</option>
+                        </select>
+                    </div>
+                    <div class="view-control">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <select id="zoomSelect" class="control-select">
+                            <option value="0.1">10%</option>
+                            <option value="0.2">20%</option>
+                            <option value="0.3">30%</option>
+                            <option value="0.4">40%</option>
+                            <option value="0.5">50%</option>
+                            <option value="0.6">60%</option>
+                            <option value="0.7">70%</option>
+                            <option value="0.8">80%</option>
+                            <option value="0.9">90%</option>
+                            <option value="1">100%</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="wireframe-main">
+            <!-- Global Style floating trigger -->
+            <div class="global-style-trigger">
+                <button id="globalStyleBtn" class="style-fab" title="Style">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7z"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Global Style Sidebar (like screenshot 1) -->
+            <aside id="globalStyleSidebar" class="global-style-sidebar" aria-label="Global Style Sidebar">
+                <div class="global-style-header">
+                    <div>
+                        <h3 style="margin:0;">Style</h3>
+                        <p style="margin:4px 0 0; font-size:12px; color:#64748b">Manage your site's initial look and
+                            feel.</p>
+                    </div>
+                    <button id="closeGlobalStyleBtn" class="btn-icon-subtle" title="Close">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="global-style-body">
+                    <div class="style-card" id="styleColorsCard">
+                        <div class="card-header">
+                            <div class="card-title">Colors</div>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </div>
+                        <div class="palette-bar" id="globalPaletteBar"></div>
+                    </div>
+                    <div class="style-card" id="styleFontsCard">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Fonts</div>
+                                <div class="card-subtitle">Heading • Paragraph</div>
+                            </div>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </div>
+                        <div class="font-preview" id="fontPreview">
+                            <div class="font-heading">Heading</div>
+                            <div class="font-paragraph">Paragraph</div>
+                        </div>
+                    </div>
+                    <div class="style-card" id="styleLogoCard">
+                        <div class="card-header">
+                            <div class="card-title">Logo</div>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </div>
+                        <div class="logo-box" id="logoBox">Logo.</div>
+                        <input type="file" id="globalLogoInput" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+                <!-- Colors Panel -->
+                <div id="colorsPanel" class="global-style-panel">
+                    <div class="panel-header">
+                        <button id="colorsBackBtn" class="btn-icon-subtle" title="Back"
+                            style="border:none;background:none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <h3>Colors</h3>
+                        <button id="colorsCloseBtn" class="btn-icon-subtle" title="Close"
+                            style="margin-left:auto;border:none;background:none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-section-title">Current</div>
+                        <div class="palette-bar" id="currentPaletteBar"></div>
+                        <div class="panel-section-title" style="display:flex;align-items:center;gap:6px;">
+                            <span>Additional colors</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </div>
+                        <div class="chip-row">
+                            <div class="chip" data-color="#ffffff">White</div>
+                            <div class="chip" data-color="#6b7280">Grey</div>
+                            <div class="chip" data-color="transparent">Transparent</div>
+                        </div>
+                        <div class="panel-section-title" style="margin-top:12px;">Suggested</div>
+                        <div class="palette-grid" id="suggestedPaletteGrid"></div>
+                        <div class="panel-actions">
+                            <button id="suggestMoreColorsBtn" class="chip">Suggest more</button>
+                            <div>
+                                <button id="paletteNextBtn" class="chip">›</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fonts Panel -->
+                <div id="fontsPanel" class="global-style-panel">
+                    <div class="panel-header">
+                        <button id="fontsBackBtn" class="btn-icon-subtle" title="Back"
+                            style="border:none;background:none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <h3>Fonts</h3>
+                        <button id="fontsCloseBtn" class="btn-icon-subtle" title="Close"
+                            style="margin-left:auto;border:none;background:none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-section-title">Current</div>
+                        <div class="font-preview" id="fontPairPreview">
+                            <div class="font-pair-heading" id="currentHeadingPreview">Heading</div>
+                            <div class="font-pair-paragraph" id="currentParagraphPreview">Paragraph</div>
+                        </div>
+                        <div class="two-col-grid" style="margin-top:8px;">
+                            <div>
+                                <label>Heading</label>
+                                <select id="headingFontSelect" class="sidebar-select">
+                                    <option value="'Abril Fatface', serif">Abril Fatface</option>
+                                    <option value="'Playfair Display', serif">Playfair Display</option>
+                                    <option value="'Merriweather', serif">Merriweather</option>
+                                    <option value="'Lora', serif">Lora</option>
+                                    <option value="'Roboto Slab', serif">Roboto Slab</option>
+                                    <option value="'Tiro Devanagari Hindi', serif">Tiro Devanagari Hindi</option>
+                                    <option value="Georgia, serif">Georgia</option>
+                                    <option value="'Times New Roman', serif">Times New Roman</option>
+                                    <option value="Inter, sans-serif">Inter</option>
+                                    <option value="'Poppins', sans-serif">Poppins</option>
+                                    <option value="'Open Sans', sans-serif">Open Sans</option>
+                                    <option value="'Source Sans 3', sans-serif">Source Sans 3</option>
+                                    <option value="'Nunito', sans-serif">Nunito</option>
+                                    <option value="'Montserrat', sans-serif">Montserrat</option>
+                                    <option value="Arial, sans-serif">Arial</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Paragraph</label>
+                                <select id="paragraphFontSelect" class="sidebar-select">
+                                    <option value="'Abril Fatface', serif">Abril Fatface</option>
+                                    <option value="'Playfair Display', serif">Playfair Display</option>
+                                    <option value="'Merriweather', serif">Merriweather</option>
+                                    <option value="'Lora', serif">Lora</option>
+                                    <option value="'Roboto Slab', serif">Roboto Slab</option>
+                                    <option value="'Tiro Devanagari Hindi', serif">Tiro Devanagari Hindi</option>
+                                    <option value="Georgia, serif">Georgia</option>
+                                    <option value="'Times New Roman', serif">Times New Roman</option>
+                                    <option value="Inter, sans-serif">Inter</option>
+                                    <option value="'Poppins', sans-serif">Poppins</option>
+                                    <option value="'Open Sans', sans-serif">Open Sans</option>
+                                    <option value="'Source Sans 3', sans-serif">Source Sans 3</option>
+                                    <option value="'Nunito', sans-serif">Nunito</option>
+                                    <option value="'Montserrat', sans-serif">Montserrat</option>
+                                    <option value="Arial, sans-serif">Arial</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="panel-section-title" style="margin-top:12px;">Suggested</div>
+                        <div id="fontSuggestions" style="display:flex; flex-direction:column; gap:10px;"></div>
+                        <div class="panel-actions">
+                            <button id="suggestMoreFontsBtn" class="chip">Suggest more</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            <!-- Style Sidebar (Left Panel) -->
+            <aside class="section-settings-sidebar" id="sectionSettingsSidebar">
+                <!-- View 1: Main Settings -->
+                <div id="sidebarMainView" class="sidebar-view active">
+                    <div class="sidebar-header">
+                        <div class="header-content">
+                            <div class="component-title-group">
+                                <span class="component-label">COMPONENT</span>
+                                <div class="component-name" id="sidebarComponentName">Header 1</div>
+                            </div>
+                            <button class="btn-icon-subtle" id="componentCardTrigger" title="Replace Component">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <path d="M9 3v18M3 9h18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <button id="closeSidebarBtn" class="close-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="sidebar-tabs">
+                        <button class="sidebar-tab active" data-tab="content">Content</button>
+                        <button class="sidebar-tab" data-tab="design">Design</button>
+                    </div>
+
+                    <div class="sidebar-scroll-content">
+
+                        <!-- Content Tab -->
+                        <div id="tab-content" class="tab-pane active">
+
+                            <!-- Accordion: Text -->
+                            <div class="accordion-item open">
+                                <div class="accordion-header">
+                                    <span>Text</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="input-group">
+                                        <label>Heading</label>
+                                        <textarea id="sectionNameInput" rows="2"
+                                            placeholder="Enter heading..."></textarea>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Description</label>
+                                        <textarea id="sectionDescInput" rows="3"
+                                            placeholder="Enter description..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Accordion: Actions -->
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Actions</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="toggle-row">
+                                        <label>Show Button</label>
+                                        <label class="switch">
+                                            <input type="checkbox" id="showCTACheck" checked>
+                                            <span class="slider round"></span>
+                                        </label>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Button Text</label>
+                                        <input type="text" id="buttonLabelInput" value="Get Started">
+                                    </div>
+                                    <div class="action-buttons-group">
+                                        <button id="shuffleLayoutBtn" class="btn-secondary full-width mb-2">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <polyline points="16 3 21 3 21 8"></polyline>
+                                                <line x1="4" y1="20" x2="21" y2="3"></line>
+                                                <polyline points="21 16 21 21 16 21"></polyline>
+                                                <line x1="15" y1="15" x2="21" y2="21"></line>
+                                                <line x1="4" y1="4" x2="9" y2="9"></line>
+                                            </svg>
+                                            Shuffle Layout
+                                        </button>
+                                        <button id="regenerateContentBtn" class="btn-secondary full-width mb-2">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path d="M23 4v6h-6"></path>
+                                                <path d="M1 20v-6h6"></path>
+                                                <path
+                                                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                                                </path>
+                                            </svg>
+                                            Regenerate Content
+                                        </button>
+                                        <button id="deleteSectionBtn" class="btn-danger full-width">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path
+                                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                                </path>
+                                            </svg>
+                                            Delete Section
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Accordion: Media -->
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Media</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="toggle-row">
+                                        <label>Show Image</label>
+                                        <label class="switch">
+                                            <input type="checkbox" id="showImageCheck" checked>
+                                            <span class="slider round"></span>
+                                        </label>
+                                    </div>
+                                    <div class="input-group" id="logoUploadGroup" style="display: none;">
+                                        <label>Logo Upload</label>
+                                        <input type="file" id="logoUploadInput" accept="image/*">
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Design Tab -->
+                        <div id="tab-design" class="tab-pane">
+
+                            <!-- Layout -->
+                            <div class="accordion-item open">
+                                <div class="accordion-header">
+                                    <span>Layout</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="input-group">
+                                        <label>Layout Variant</label>
+                                        <select id="layoutVariantSelect" class="sidebar-select">
+                                            <option value="layout-default">Default</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Typography -->
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Typography</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="input-group">
+                                        <label>Font Family</label>
+                                        <select id="fontFamilySelect" class="sidebar-select">
+                                            <option value="Inter, sans-serif">Inter</option>
+                                            <option value="Arial, sans-serif">Arial</option>
+                                            <option value="'Times New Roman', serif">Times New Roman</option>
+                                            <option value="'Courier New', monospace">Courier New</option>
+                                            <option value="Georgia, serif">Georgia</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Text Color</label>
+                                        <div class="color-picker-wrapper">
+                                            <input type="color" id="textColorInput" value="#1e293b">
+                                            <span class="color-value">#1e293b</span>
+                                        </div>
+                                    </div>
+                                    <div class="two-col-grid">
+                                        <div class="input-group">
+                                            <label>Size (px)</label>
+                                            <input type="number" id="fontSizeInput" value="16" min="8" max="72">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Weight</label>
+                                            <select id="fontWeightSelect" class="sidebar-select">
+                                                <option value="400">Regular</option>
+                                                <option value="500">Medium</option>
+                                                <option value="600">Semi Bold</option>
+                                                <option value="700">Bold</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Background -->
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Background</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="input-group">
+                                        <label>Background Color</label>
+                                        <div class="color-picker-wrapper">
+                                            <input type="color" id="bgColorInput" value="#ffffff">
+                                            <span class="color-value">#ffffff</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Spacing -->
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Spacing</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="two-col-grid">
+                                        <div class="input-group">
+                                            <label>Padding (px)</label>
+                                            <input type="number" id="paddingInput" value="40" min="0" step="4">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Margin (px)</label>
+                                            <input type="number" id="marginInput" value="0" min="0" step="4">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Button Style -->
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Button Style</span>
+                                    <svg class="accordion-chevron" width="12" height="12" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="input-group">
+                                        <label>Button Color</label>
+                                        <div class="color-picker-wrapper">
+                                            <input type="color" id="btnColorInput" value="#3b82f6">
+                                            <span class="color-value">#3b82f6</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Button Text Color</label>
+                                        <div class="color-picker-wrapper">
+                                            <input type="color" id="btnTextColorInput" value="#ffffff">
+                                            <span class="color-value">#ffffff</span>
+                                        </div>
+                                    </div>
+                                    <div class="two-col-grid">
+                                        <div class="input-group">
+                                            <label>Radius (px)</label>
+                                            <input type="number" id="btnRadiusInput" value="6" min="0" max="50">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Size</label>
+                                            <select id="btnSizeSelect" class="sidebar-select">
+                                                <option value="small">Small</option>
+                                                <option value="medium" selected>Medium</option>
+                                                <option value="large">Large</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View 2: Replace Component -->
+                <div id="sidebarReplaceView" class="sidebar-view">
+                    <div class="sidebar-header">
+                        <button id="backToSettingsBtn" class="back-button"
+                            style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex; align-items:center;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <h3>Section</h3>
+                        <span id="suggestionSectionName"
+                            style="margin-left:auto; color:#6b7280; font-size:12px;"></span>
+                    </div>
+                    <div class="sidebar-content no-padding">
+                        <!-- Search Bar -->
+                        <div class="search-container">
+                            <div class="search-box">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" class="search-icon">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <input type="text" placeholder="Search" class="search-input">
+                            </div>
+                        </div>
+                        <div class="suggestions-list" id="suggestionList">
+                            <!-- Items will be injected via JS -->
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Wireframe Canvas (Horizontal Board) -->
+            <div class="wireframe-canvas">
+                <div class="wireframe-board" id="wireframeBoard">
+                    <div class="empty-wireframe">
+                        <div class="empty-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <line x1="9" y1="9" x2="15" y2="9" />
+                                <line x1="9" y1="12" x2="15" y2="12" />
+                                <line x1="9" y1="15" x2="15" y2="15" />
+                            </svg>
+                        </div>
+                        <h3>Loading Pages...</h3>
+                        <p>Synchronizing with sitemap...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/state-manager.js?v=20260218-v13"></script>
+    <script src="js/wireframe-icons.js?v=20260401a"></script>
+    <script src="js/wireframe-editor.js?v=20260312-v16"></script>
+    <script src="js/wireframe.js?v=20260218-v13"></script>
+    <script>
+        // Initialize State Manager and components in correct order
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🏁 DOMContentLoaded event fired in wireframe.html');
+
+            // Step 1: Initialize StateManager
+            if (typeof StateManager !== 'undefined') {
+                if (!window.stateManager) {
+                    console.log('📦 Initializing StateManager...');
+                    window.stateManager = new StateManager();
+                    console.log('✅ StateManager initialized');
+                }
+            } else {
+                console.error('❌ StateManager class is undefined');
+            }
+
+            // Step 2: Initialize WireframeEditor FIRST (before WireframeApp)
+            if (typeof WireframeEditor !== 'undefined') {
+                if (!window.wireframeEditor) {
+                    console.log('🎨 Initializing WireframeEditor...');
+                    try {
+                        window.wireframeEditor = new WireframeEditor();
+                        console.log('✅ WireframeEditor initialized successfully');
+                    } catch (e) {
+                        console.error('❌ Error initializing WireframeEditor:', e);
+                    }
+                }
+            } else {
+                console.error('❌ WireframeEditor class is undefined');
+            }
+
+            // Step 3: Initialize WireframeApp AFTER WireframeEditor is ready
+            // Use setTimeout to ensure WireframeEditor is fully initialized
+            setTimeout(() => {
+                if (typeof WireframeApp !== 'undefined') {
+                    if (!window.app) {
+                        console.log('📱 Initializing WireframeApp...');
+                        try {
+                            window.app = new WireframeApp();
+                            console.log('✅ WireframeApp initialized successfully');
+                        } catch (e) {
+                            console.error('❌ Error initializing WireframeApp:', e);
+                        }
+                    }
+                } else {
+                    console.error('❌ WireframeApp class is undefined');
+                }
+            }, 50); // Small delay to ensure WireframeEditor is fully ready
+        });
+    </script>
+</body>
+
+</html>
