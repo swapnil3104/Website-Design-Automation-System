@@ -1,0 +1,62 @@
+{
+  "qwen2.5:3b": {
+    "model": "qwen2.5:3b",
+    "json_test": {
+      "success": true,
+      "valid_json": true,
+      "schema_complete": true,
+      "duration_sec": 4.99,
+      "completion_tokens": 204,
+      "tokens_per_sec": 40.9
+    },
+    "instruction_following_test": {
+      "success": true,
+      "valid_array": true,
+      "exact_count_matched": true,
+      "no_markdown_fences": true,
+      "duration_sec": 2.78
+    },
+    "wireframe_generation_test": {
+      "success": true,
+      "section_count": 5,
+      "section_types": [
+        "navbar",
+        "hero",
+        "features",
+        "testimonials",
+        "footer"
+      ],
+      "duration_sec": 5.39
+    }
+  },
+  "nemotron-mini:4b": {
+    "model": "nemotron-mini:4b",
+    "json_test": {
+      "success": true,
+      "valid_json": true,
+      "schema_complete": true,
+      "duration_sec": 18.28,
+      "completion_tokens": 422,
+      "tokens_per_sec": 23.1
+    },
+    "instruction_following_test": {
+      "success": true,
+      "valid_array": true,
+      "exact_count_matched": true,
+      "no_markdown_fences": true,
+      "duration_sec": 3.28
+    },
+    "wireframe_generation_test": {
+      "success": true,
+      "section_count": 5,
+      "section_types": [
+        "navbar",
+        "hero",
+        "features",
+        "testimonials",
+        "footer"
+      ],
+      "duration_sec": 9.89
+    }
+  }
+}

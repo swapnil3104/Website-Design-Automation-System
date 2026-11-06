@@ -123,6 +123,12 @@ class WireframeApp {
 
         // Export All Button
         const exportAllBtn = document.getElementById('exportAllBtn');
+        const generateAllBtn = document.getElementById('generateAllBtn');
+        if (generateAllBtn) {
+            generateAllBtn.addEventListener('click', () => {
+                this.generateAllPages();
+            });
+        }
         if (exportAllBtn) {
             exportAllBtn.addEventListener('click', () => {
                 this.exportAllPages();
@@ -860,6 +866,74 @@ class WireframeApp {
             'figma': 'Figma'
         };
         return formatNames[format] || format;
+    }
+
+    async generateAllPages() {
+        const generateAllBtn = document.getElementById('generateAllBtn');
+        const origText = generateAllBtn ? generateAllBtn.textContent : 'Generate All';
+        if (generateAllBtn) {
+            generateAllBtn.textContent = 'Generating...';
+            generateAllBtn.disabled = true;
+        }
+
+        if (window.wireframeEditor && typeof window.wireframeEditor.showNotification === 'function') {
+            window.wireframeEditor.showNotification('Generating wireframes for all pages...');
+        }
+
+        const sitemap = window.stateManager ? window.stateManager.getSitemap() : null;
+        if (!sitemap || !sitemap.pages || sitemap.pages.length === 0) {
+            alert('No pages found in sitemap.');
+            if (generateAllBtn) {
+                generateAllBtn.textContent = origText;
+                generateAllBtn.disabled = false;
+            }
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/generate-wireframe/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sitemap_data: sitemap })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const wfPages = (data.wireframe && data.wireframe.pages) ? data.wireframe.pages : (data.pages || []);
+                if (wfPages && wfPages.length > 0) {
+                    wfPages.forEach(wfPage => {
+                        const targetPage = sitemap.pages.find(p => p.id === wfPage.id || p.name === wfPage.name);
+                        if (targetPage && wfPage.sections) {
+                            targetPage.sections = wfPage.sections;
+                        }
+                    });
+                    if (window.stateManager) {
+                        window.stateManager.setSitemap(sitemap);
+                        window.stateManager.saveToLocalStorage();
+                    }
+                    if (window.wireframeEditor) {
+                        window.wireframeEditor.renderAllPages(sitemap);
+                        window.wireframeEditor.showNotification('All pages generated successfully!');
+                    }
+                } else {
+                    throw new Error('No wireframe pages returned by API');
+                }
+            } else {
+                throw new Error(`API returned status ${response.status}`);
+            }
+        } catch (err) {
+            console.warn('Backend generation failed or offline, falling back to local generator:', err);
+            if (window.wireframeEditor && typeof window.wireframeEditor.generateFallbackWireframesForAllPages === 'function') {
+                window.wireframeEditor.generateFallbackWireframesForAllPages();
+            } else {
+                alert('Generation failed and fallback editor unavailable.');
+            }
+        } finally {
+            if (generateAllBtn) {
+                generateAllBtn.textContent = origText;
+                generateAllBtn.disabled = false;
+            }
+        }
     }
 
     async exportAllPages() {
@@ -1828,6 +1902,15 @@ class WireframeApp {
     translateToReactComponent(type, title) {
         const lowerTitle = title.toLowerCase();
         const lowType = (type || '').toLowerCase();
+
+        if (lowType === 'faq' || lowerTitle.includes('faq') || lowerTitle.includes('question')) return 'FAQSection';
+        if (lowType === 'product-grid' || lowType === 'products' || lowerTitle.includes('product') || lowerTitle.includes('catalog')) return 'ProductGrid';
+        if (lowType === 'services' || lowType === 'services-grid' || lowerTitle.includes('service')) return 'ServicesGrid';
+        if (lowType === 'team' || lowerTitle.includes('team') || lowerTitle.includes('leadership')) return 'TeamSection';
+        if (lowType === 'about' || lowerTitle.includes('about') || lowerTitle.includes('story') || lowType === 'story') return 'AboutSection';
+        if (lowType === 'image-text') return 'ImageTextSection';
+        if (lowType === 'process' || lowerTitle.includes('process') || lowerTitle.includes('how it works')) return 'ProcessSection';
+        if (lowType === 'sidebar' || lowerTitle.includes('sidebar')) return 'SidebarSection';
 
         if (lowType === 'hero' || lowerTitle.includes('hero')) return 'HeroSection';
         if (lowType === 'navbar' || lowerTitle.includes('nav')) return 'Navbar';
@@ -2837,6 +2920,14 @@ import StackSection from './sections/StackSection.jsx';
 import StatsSection from './sections/StatsSection.jsx';
 import MapSection from './sections/MapSection.jsx';
 import ContactSection from './sections/ContactSection.jsx';
+import AboutSection from './sections/AboutSection.jsx';
+import ImageTextSection from './sections/ImageTextSection.jsx';
+import ServicesGrid from './sections/ServicesGrid.jsx';
+import ProductGrid from './sections/ProductGrid.jsx';
+import TeamSection from './sections/TeamSection.jsx';
+import FAQSection from './sections/FAQSection.jsx';
+import ProcessSection from './sections/ProcessSection.jsx';
+import SidebarSection from './sections/SidebarSection.jsx';
 import Section from './sections/Section.jsx';
 
 const SectionRenderer = ({ section }) => {
@@ -2854,6 +2945,14 @@ const SectionRenderer = ({ section }) => {
     case 'StatsSection': return <StatsSection data={section} />;
     case 'MapSection': return <MapSection data={section} />;
     case 'ContactSection': return <ContactSection data={section} />;
+    case 'AboutSection': return <AboutSection data={section} />;
+    case 'ImageTextSection': return <ImageTextSection data={section} />;
+    case 'ServicesGrid': return <ServicesGrid data={section} />;
+    case 'ProductGrid': return <ProductGrid data={section} />;
+    case 'TeamSection': return <TeamSection data={section} />;
+    case 'FAQSection': return <FAQSection data={section} />;
+    case 'ProcessSection': return <ProcessSection data={section} />;
+    case 'SidebarSection': return <SidebarSection data={section} />;
     case 'Footer': return <Footer data={section} />;
     default: return <Section data={section} />;
   }
@@ -3551,6 +3650,269 @@ const Section = ({ data }) => {
 };
 export default Section;`);
 
+        // About Section
+        sectionsFolder.file("AboutSection.jsx", `import React from 'react';
+const AboutSection = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+        <div>
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-wide mb-3">About Us</span>
+          <h2 className="text-3xl font-bold mb-4">{content.title || 'About Our Mission'}</h2>
+          <p className="text-base text-gray-600 leading-relaxed mb-6">{content.description}</p>
+          {content.items && content.items.length > 0 && (
+            <div className="flex gap-8 pt-6 border-t border-gray-100">
+              {content.items.slice(0, 3).map((item, i) => (
+                <div key={i}>
+                  <div className="text-3xl font-bold text-blue-600">{item.title || item.value}</div>
+                  <div className="text-sm text-gray-500 mt-1">{item.desc || item.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="w-full h-80 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 font-semibold">
+          Brand Story Visual
+        </div>
+      </div>
+    </section>
+  );
+};
+export default AboutSection;`);
+
+        // Image Text Section
+        sectionsFolder.file("ImageTextSection.jsx", `import React from 'react';
+const ImageTextSection = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+        <div className="w-full h-80 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 font-semibold">
+          Architecture Showcase
+        </div>
+        <div>
+          <h2 className="text-3xl font-bold mb-4">{content.title || 'Transforming Concepts into Execution'}</h2>
+          <p className="text-base text-gray-600 leading-relaxed mb-6">{content.description}</p>
+          {content.items && (
+            <ul className="space-y-3">
+              {content.items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-green-500 font-bold">✓</span>
+                  <span><strong>{item.title}:</strong> {item.desc}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+export default ImageTextSection;`);
+
+        // Services Grid
+        sectionsFolder.file("ServicesGrid.jsx", `import React from 'react';
+import IconRenderer from '../components/IconRenderer';
+const ServicesGrid = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-wide mb-3">What We Offer</span>
+          <h2 className="text-3xl font-bold mb-3">{content.title || 'Our Services'}</h2>
+          <p className="text-gray-600">{content.description}</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {(content.items || []).map((item, i) => (
+            <div key={i} className="bg-white border border-gray-100 rounded-xl p-8 flex flex-col items-start shadow-sm hover:shadow-md transition-all">
+              <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mb-5">
+                <IconRenderer name={item.icon || 'Briefcase'} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>
+              <p className="text-gray-600 text-sm flex-1 leading-relaxed">{item.desc}</p>
+              {item.price && <div className="text-blue-600 font-bold text-sm mt-4">{item.price}</div>}
+              <button className="mt-4 text-sm font-semibold text-blue-600 hover:underline">Learn More →</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+export default ServicesGrid;`);
+
+        // Product Grid
+        sectionsFolder.file("ProductGrid.jsx", `import React from 'react';
+const ProductGrid = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-wide mb-3">Store Catalog</span>
+          <h2 className="text-3xl font-bold mb-3">{content.title || 'Featured Products'}</h2>
+          <p className="text-gray-600">{content.description}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {(content.items || []).map((item, i) => (
+            <div key={i} className="bg-white border border-gray-100 rounded-xl overflow-hidden flex flex-col shadow-sm hover:shadow-md transition-all">
+              <div className="h-44 bg-gray-100 border-b border-dashed border-gray-200 flex items-center justify-center text-gray-400 font-medium">
+                {item.title || 'Product Photo'}
+              </div>
+              <div className="p-4 flex flex-col flex-1">
+                <div className="text-amber-500 text-xs mb-1">★★★★★</div>
+                <h4 className="font-semibold text-gray-900 text-sm mb-3">{item.title || 'Product'}</h4>
+                <div className="flex justify-between items-center mt-auto">
+                  <span className="font-bold text-lg text-gray-900">{item.price || '$99'}</span>
+                  <button className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors">Add to Cart</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+export default ProductGrid;`);
+
+        // Team Section
+        sectionsFolder.file("TeamSection.jsx", `import React from 'react';
+const TeamSection = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-wide mb-3">Leadership</span>
+          <h2 className="text-3xl font-bold mb-3">{content.title || 'Meet the Team'}</h2>
+          <p className="text-gray-600">{content.description}</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {(content.items || []).map((member, i) => (
+            <div key={i} className="bg-white border border-gray-100 rounded-xl p-6 text-center shadow-sm">
+              <div className="w-24 h-24 rounded-full bg-gray-200 border-2 border-dashed border-gray-300 mx-auto mb-4 flex items-center justify-center text-gray-400 text-2xl font-bold">
+                {(member.name || member.title || 'U')[0]}
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg">{member.name || member.title}</h3>
+              <div className="text-blue-600 text-sm font-semibold mb-2">{member.role || 'Team Lead'}</div>
+              <p className="text-gray-500 text-sm leading-relaxed mb-4">{member.desc}</p>
+              <div className="text-xs text-gray-400 font-medium">LinkedIn • Twitter</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+export default TeamSection;`);
+
+        // FAQ Section
+        sectionsFolder.file("FAQSection.jsx", `import React, { useState } from 'react';
+const FAQSection = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  const [openIndex, setOpenIndex] = useState(0);
+  const items = content.items || [];
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-12">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-wide mb-3">Got Questions?</span>
+          <h2 className="text-3xl font-bold mb-3">{content.title || 'Frequently Asked Questions'}</h2>
+          <p className="text-gray-600">{content.description}</p>
+        </div>
+        <div className="space-y-3">
+          {items.map((item, i) => {
+            const isOpen = openIndex === i;
+            return (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all shadow-sm">
+                <button
+                  className="w-full px-6 py-4 text-left font-semibold text-gray-900 flex justify-between items-center hover:bg-gray-50"
+                  onClick={() => setOpenIndex(isOpen ? null : i)}
+                >
+                  <span>{item.title || item.question}</span>
+                  <span className={'transform transition-transform ' + (isOpen ? 'rotate-180' : '')}>▾</span>
+                </button>
+                {isOpen && (
+                  <div className="px-6 pb-4 text-gray-600 text-sm leading-relaxed border-t border-gray-100 pt-3">
+                    {item.desc || item.answer}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+};
+export default FAQSection;`);
+
+        // Process Section
+        sectionsFolder.file("ProcessSection.jsx", `import React from 'react';
+const ProcessSection = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-wide mb-3">The Workflow</span>
+          <h2 className="text-3xl font-bold mb-3">{content.title || 'How It Works'}</h2>
+          <p className="text-gray-600">{content.description}</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {(content.items || []).map((step, i) => (
+            <div key={i} className="bg-white border border-gray-100 rounded-xl p-6 text-center shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4">
+                {i + 1}
+              </div>
+              <h3 className="font-bold text-gray-900 text-base mb-2">{step.title}</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+export default ProcessSection;`);
+
+        // Sidebar Section
+        sectionsFolder.file("SidebarSection.jsx", `import React from 'react';
+const SidebarSection = ({ data }) => {
+  const { content = {}, tailwind = {} } = data;
+  return (
+    <section className={tailwind.section || 'w-full py-20 px-6'} style={tailwind.sectionStyle || {}}>
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-3xl font-bold text-gray-900">{content.title || 'Editorial Hub'}</h2>
+          <p className="text-gray-600 leading-relaxed text-base">{content.description}</p>
+          <div className="w-full h-72 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 font-semibold">
+            Featured Content Visual
+          </div>
+        </div>
+        <aside className="space-y-6">
+          <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
+            <h4 className="font-bold text-gray-900 mb-3 text-base">Quick Search</h4>
+            <input type="text" placeholder="Search documentation..." className="w-full p-2.5 border border-gray-200 rounded-lg text-sm" readOnly />
+          </div>
+          <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
+            <h4 className="font-bold text-gray-900 mb-3 text-base">Key Categories</h4>
+            <ul className="space-y-2 text-sm text-blue-600">
+              <li>Architecture Overview (12)</li>
+              <li>Component Catalog (32)</li>
+              <li>AI Providers (4)</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+};
+export default SidebarSection;`);
+
 
         // 5. Generate and Download
         zip.generateAsync({ type: "blob" }).then(function (content) {
@@ -3771,4 +4133,9 @@ export default Section;`);
 
         return html;
     }
+}
+
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { WireframeApp };
 }

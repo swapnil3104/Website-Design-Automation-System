@@ -48,9 +48,23 @@
                     <button class="tab-btn" data-tab="sitemap">Sitemap</button>
                     <button class="tab-btn active" data-tab="wireframe">Wireframe</button>
                 </div>
+                <!-- Page Switcher -->
+                <div class="page-switcher-bar" id="pageSwitcherBar" title="Switch between pages or view all pages">
+                    <span class="page-switcher-label">PAGE:</span>
+                    <select id="pageSelectDropdown" class="page-select-dropdown" aria-label="Select Page">
+                        <option value="all">All Pages</option>
+                    </select>
+                </div>
             </div>
 
             <div class="nav-right">
+                <!-- Save Status Indicator -->
+                <div class="save-status-indicator" id="saveStatusIndicator" title="All edits auto-saved to localStorage">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span id="saveStatusText">Saved</span>
+                </div>
                 <div class="export-dropdown-container" style="position: relative; display: inline-block;">
 
                     <button id="exportPageBtn" class="btn btn-secondary">
@@ -136,6 +150,31 @@
                 <button id="exportAllBtn" class="btn btn-secondary">Export All</button>
                 <button id="generateAllBtn" class="btn btn-primary">Generate All</button>
                 <div class="view-controls" style="margin-left:12px;">
+                    <!-- Quick Device Toggle Buttons -->
+                    <div class="device-toggle-group" id="deviceToggleGroup">
+                        <button class="device-toggle-btn active" data-bp="desktop" title="Desktop View (1024px+)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            <span>Desktop</span>
+                        </button>
+                        <button class="device-toggle-btn" data-bp="tablet" title="Tablet View (768px)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="4" y="2" width="16" height="20" rx="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                            <span>Tablet</span>
+                        </button>
+                        <button class="device-toggle-btn" data-bp="mobile" title="Mobile View (375px)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                            <span>Mobile</span>
+                        </button>
+                    </div>
                     <div class="view-control">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
@@ -678,7 +717,7 @@
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" class="search-icon">
                                     <circle cx="11" cy="11" r="8" />
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                 </svg>
                                 <input type="text" placeholder="Search" class="search-input">
                             </div>
@@ -711,9 +750,43 @@
         </main>
     </div>
 
+    <!-- Add Section Modal Dialog -->
+    <div id="addSectionModal" class="wfe-modal-overlay" style="display:none;" aria-hidden="true">
+        <div class="wfe-modal-dialog">
+            <div class="wfe-modal-header">
+                <div>
+                    <h3 id="addSectionModalTitle" style="margin:0; font-size:18px; font-weight:700;">Add Section</h3>
+                    <p id="addSectionModalSubtitle" style="margin:4px 0 0; font-size:13px; color:#64748b;">Choose a section component to insert into this page.</p>
+                </div>
+                <button id="closeAddSectionModalBtn" class="close-btn" title="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="wfe-modal-search">
+                <input type="text" id="addSectionSearchInput" placeholder="Search section types (e.g. hero, pricing, faq, testimonials)..." class="wfe-modal-search-input">
+            </div>
+            <div class="wfe-modal-categories" id="addSectionCategoryTabs">
+                <button class="wfe-cat-tab active" data-cat="all">All (32)</button>
+                <button class="wfe-cat-tab" data-cat="nav">Navigation</button>
+                <button class="wfe-cat-tab" data-cat="hero">Hero</button>
+                <button class="wfe-cat-tab" data-cat="content">Content</button>
+                <button class="wfe-cat-tab" data-cat="proof">Social Proof</button>
+                <button class="wfe-cat-tab" data-cat="conversion">Conversion</button>
+                <button class="wfe-cat-tab" data-cat="footer">Footer</button>
+            </div>
+            <div class="wfe-modal-body" id="addSectionGrid">
+                <!-- Injected via WireframeEditor.populateAddSectionModal -->
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="js/state-manager.js?v=20260218-v13"></script>
     <script src="js/wireframe-icons.js?v=20260401a"></script>
+    <script src="js/wireframe-components.js?v=20260401a"></script>
     <script src="js/wireframe-editor.js?v=20260312-v16"></script>
     <script src="js/wireframe.js?v=20260218-v13"></script>
     <script>

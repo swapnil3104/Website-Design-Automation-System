@@ -3,9 +3,10 @@ class WireframeEditor {
     constructor() {
         this.currentPageId = null;
         this.currentBreakpoint = 'desktop';
-        this.editMode = false;
+        this.editMode = true;
         this.activeSection = null; // Track currently editing section
         this.globalStyles = { palette: null, fontFamily: 'Inter, sans-serif', logoUrl: null };
+        this.addSectionTarget = null;
         this.init();
     }
 
@@ -13,6 +14,9 @@ class WireframeEditor {
         this.bindEvents();
         this.bindSidebarControls(); // Bind sidebar inputs
         this.bindGlobalStyleControls();
+        this.bindBreakpointControls();
+        this.bindPageSwitcher();
+        this.bindModalEvents();
         this.setupStateSync();
     }
 
@@ -384,8 +388,81 @@ class WireframeEditor {
         });
     }
 
+    bindBreakpointControls() {
+        const screenSizeSelect = document.getElementById('screenSizeSelect');
+        if (screenSizeSelect) {
+            screenSizeSelect.addEventListener('change', (e) => {
+                this.setBreakpoint(e.target.value);
+            });
+        }
+        document.querySelectorAll('.device-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const bp = btn.dataset.bp;
+                if (bp) this.setBreakpoint(bp);
+            });
+        });
+    }
+
+    bindPageSwitcher() {
+        const select = document.getElementById('pageSelectDropdown');
+        if (select) {
+            select.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val === 'all') {
+                    this.showAllPages();
+                } else {
+                    this.switchToPage(val);
+                }
+            });
+        }
+    }
+
+    showAllPages() {
+        this.currentPageId = null;
+        document.querySelectorAll('.wireframe-page-column').forEach(col => {
+            col.classList.remove('active-page-column');
+            col.style.display = '';
+        });
+        const select = document.getElementById('pageSelectDropdown');
+        if (select) select.value = 'all';
+
+        const canvas = document.querySelector('.wireframe-canvas');
+        if (canvas) canvas.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+
+    switchToPage(pageId) {
+        this.currentPageId = String(pageId);
+        const select = document.getElementById('pageSelectDropdown');
+        if (select && select.value !== this.currentPageId) {
+            select.value = this.currentPageId;
+        }
+
+        const columns = document.querySelectorAll('.wireframe-page-column');
+        columns.forEach(col => {
+            const isMatch = String(col.dataset.pageId) === this.currentPageId;
+            col.classList.toggle('active-page-column', isMatch);
+            if (isMatch) {
+                col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        });
+
+        if (window.stateManager) {
+            const page = window.stateManager.findPageById(pageId);
+            if (page && window.app && typeof window.app.selectPageForExport === 'function') {
+                window.app.selectPageForExport(page);
+            }
+        }
+    }
+
     setBreakpoint(bp) {
-        this.currentBreakpoint = bp;
+        this.currentBreakpoint = bp || 'desktop';
+        const select = document.getElementById('screenSizeSelect');
+        if (select && select.value !== this.currentBreakpoint) select.value = this.currentBreakpoint;
+        document.querySelectorAll('.device-toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.bp === this.currentBreakpoint);
+        });
+        window.dispatchEvent(new Event('resize'));
         const board = document.getElementById('wireframeBoard');
         if (!board) return;
         board.classList.remove('bp-desktop', 'bp-tablet', 'bp-mobile');
@@ -912,7 +989,7 @@ class WireframeEditor {
     }
 
     populateReplaceList() {
-        const listContainer = document.getElementById('replaceComponentList');
+        const listContainer = document.getElementById('suggestionList') || document.getElementById('replaceComponentList');
         if (!listContainer || !this.activeSection) return;
 
         // Mock components based on current type or all types
@@ -941,6 +1018,24 @@ class WireframeEditor {
     }
 
     getComponentOptions(type) {
+        if (typeof this.getAllSectionTypes === 'function') {
+            return this.getAllSectionTypes();
+        }
+        return [
+            { type: 'hero', name: 'Hero Section', variant: 'default' },
+            { type: 'navbar', name: 'Navbar', variant: 'default' },
+            { type: 'features', name: 'Features Grid', variant: 'grid' },
+            { type: 'services', name: 'Services Grid', variant: 'default' },
+            { type: 'pricing', name: 'Pricing Plans', variant: 'default' },
+            { type: 'testimonials', name: 'Testimonials', variant: 'default' },
+            { type: 'faq', name: 'FAQ Accordion', variant: 'default' },
+            { type: 'about', name: 'About & Story', variant: 'default' },
+            { type: 'contact', name: 'Contact Form', variant: 'default' },
+            { type: 'footer', name: 'Footer', variant: 'default' }
+        ];
+    }
+
+    getComponentOptions_old(type) {
         // Return list of available components
         // In a real app, this would be more dynamic
         const allComponents = [
@@ -1056,6 +1151,11 @@ class WireframeEditor {
         // Update name in sidebar
         const nameEl = document.getElementById('sidebarComponentName');
         if (nameEl) nameEl.textContent = newType.charAt(0).toUpperCase() + newType.slice(1);
+        const labelEl = this.activeSection.element.querySelector('.section-label');
+        if (labelEl) labelEl.textContent = newType;
+        if (typeof this.showNotification === 'function') {
+            this.showNotification(`Component replaced with ${newType}`);
+        }
 
         // Update State
         if (window.stateManager) {
@@ -1345,6 +1445,681 @@ class WireframeEditor {
         });
     }
 
+    // Modal & Section Insertion
+    bindModalEvents() {
+        const closeBtn = document.getElementById('closeAddSectionModalBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeAddSectionModal());
+        }
+
+        const modal = document.getElementById('addSectionModal');
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) this.closeAddSectionModal();
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.closeAddSectionModal();
+        });
+
+        const searchInput = document.getElementById('addSectionSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.filterAddSectionGrid(e.target.value);
+            });
+        }
+
+        const catTabs = document.getElementById('addSectionCategoryTabs');
+        if (catTabs) {
+            catTabs.addEventListener('click', (e) => {
+                const btn = e.target.closest('.wfe-cat-tab');
+                if (!btn) return;
+                catTabs.querySelectorAll('.wfe-cat-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.filterAddSectionCategory(btn.dataset.cat);
+            });
+        }
+    }
+
+    openAddSectionModal(pageId, insertIndex = null) {
+        this.addSectionTarget = { pageId, insertIndex };
+        const modal = document.getElementById('addSectionModal');
+        if (!modal) return;
+
+        const page = window.stateManager ? window.stateManager.findPageById(pageId) : null;
+        const sub = document.getElementById('addSectionModalSubtitle');
+        if (sub && page) {
+            sub.textContent = `Insert a new section into "${page.name}" ${insertIndex !== null ? `at position ${insertIndex + 1}` : 'at the bottom'}.`;
+        }
+
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        this.populateAddSectionModal();
+    }
+
+    closeAddSectionModal() {
+        const modal = document.getElementById('addSectionModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        this.addSectionTarget = null;
+    }
+
+    getAllSectionTypes() {
+        return [
+            // Navigation
+            { type: 'navbar', name: 'Standard Navbar', category: 'nav', icon: '🧭', desc: 'Brand logo, clean navigation links, and primary action button.' },
+            { type: 'mega-menu', name: 'Mega Menu Navbar', category: 'nav', icon: '📂', desc: 'Multi-column category showcase and promotional dropdown.' },
+            { type: 'dropdown-nav', name: 'Dropdown Navbar', category: 'nav', icon: '📑', desc: 'Nested navigation with hoverable sub-menu items.' },
+            { type: 'mobile-drawer', name: 'Mobile Drawer Nav', category: 'nav', icon: '📱', desc: 'Compact mobile navigation with drawer menu toggle.' },
+
+            // Hero
+            { type: 'hero', name: 'Split Hero Section', category: 'hero', icon: '🚀', desc: 'High-impact 2-column headline with image placeholder and CTA.' },
+            { type: 'hero-centered', name: 'Centered Hero', category: 'hero', icon: '🎯', desc: 'Centered headline with supporting badge, copy, and dual buttons.' },
+            { type: 'hero-product', name: 'Product Hero', category: 'hero', icon: '🛍️', desc: 'Showcase an e-commerce or SaaS product with ratings and perks.' },
+            { type: 'hero-cta', name: 'Lead Capture Hero', category: 'hero', icon: '⚡', desc: 'Hero headline with inline email capture input and security trust badge.' },
+            { type: 'hero-asymmetric', name: 'Asymmetric 60/40 Hero', category: 'hero', icon: '📐', desc: 'Modern asymmetric tilted proportion layout.' },
+            { type: 'hero-full-bg', name: 'Full-Bleed Hero', category: 'hero', icon: '🖼️', desc: 'Full-bleed gradient backdrop with crisp contrasting typography.' },
+
+            // Content
+            { type: 'features', name: 'Features Grid', category: 'content', icon: '✨', desc: 'Structured cards with Lucide icons, titles, and benefit descriptions.' },
+            { type: 'about', name: 'About & Company Story', category: 'content', icon: '🏢', desc: 'Company mission statement, founding story, and milestone counters.' },
+            { type: 'services', name: 'Services Showcase', category: 'content', icon: '🛠️', desc: 'Client service offerings with category badges and deliverables.' },
+            { type: 'products', name: 'Product Catalog Grid', category: 'content', icon: '📦', desc: 'E-commerce product cards with prices, ratings, and buy actions.' },
+            { type: 'image-text', name: 'Image & Text Split', category: 'content', icon: '📰', desc: 'Alternating editorial split with image and capability checklist.' },
+            { type: 'process', name: 'Step-by-Step Process', category: 'content', icon: '🔢', desc: 'Sequential 1-2-3-4 step workflow with milestone markers.' },
+            { type: 'sidebar', name: 'Sidebar Article Layout', category: 'content', icon: '📊', desc: 'Main content flow with sticky sidebar widgets and resource links.' },
+            { type: 'content', name: 'General Content Block', category: 'content', icon: '📝', desc: 'Flexible editorial section with structured cards and copy.' },
+
+            // Social Proof
+            { type: 'testimonials', name: 'Customer Testimonials', category: 'proof', icon: '💬', desc: 'Verified customer quote cards with star ratings, avatars, and roles.' },
+            { type: 'stats', name: 'Statistics & Metrics', category: 'proof', icon: '📈', desc: 'Key performance metrics with bold numbers and descriptive labels.' },
+            { type: 'team', name: 'Team Member Grid', category: 'proof', icon: '👥', desc: 'Leadership profiles with photos, titles, and social badges.' },
+            { type: 'gallery', name: 'Media & Work Gallery', category: 'proof', icon: '🎨', desc: 'Visual portfolio grid with caption badges and project categories.' },
+            { type: 'quote', name: 'Executive Pull-Quote', category: 'proof', icon: '💭', desc: 'Bold pull-quote highlighting endorsements or core mission.' },
+            { type: 'timeline', name: 'Company Timeline', category: 'proof', icon: '⏱️', desc: 'Chronological timeline of milestone events and accomplishments.' },
+            { type: 'partners', name: 'Partner & Client Logos', category: 'proof', icon: '🤝', desc: 'Trust badge banner displaying partner and client enterprise brands.' },
+
+            // Conversion
+            { type: 'pricing', name: 'Pricing Tiers Table', category: 'conversion', icon: '💳', desc: 'Tiered plan cards with feature checkmarks and billing switch.' },
+            { type: 'faq', name: 'FAQ Accordion', category: 'conversion', icon: '❓', desc: 'Expandable question and answer accordion cards with support CTA.' },
+            { type: 'contact', name: 'Contact Form & Details', category: 'conversion', icon: '✉️', desc: 'Interactive lead form alongside office address, phone, and hours.' },
+            { type: 'cta', name: 'Call to Action Banner', category: 'conversion', icon: '📣', desc: 'High-contrast conversion banner with primary headline and buttons.' },
+            { type: 'newsletter', name: 'Newsletter Signup', category: 'conversion', icon: '📬', desc: 'Email subscriber opt-in box with privacy guarantee.' },
+            { type: 'login', name: 'Authentication / Login Box', category: 'conversion', icon: '🔐', desc: 'Login and signup entry card with social authentication buttons.' },
+
+            // Footer & Utilities
+            { type: 'footer', name: 'Multi-Column Footer', category: 'footer', icon: '⚓', desc: 'Comprehensive footer with categorized links, newsletter, and copyright.' },
+            { type: 'banner', name: 'Announcement Bar', category: 'footer', icon: '🏷️', desc: 'Slender top or bottom notification banner with link.' },
+            { type: 'divider', name: 'Visual Section Divider', category: 'footer', icon: '➖', desc: 'Clean geometric divider separating disparate content topics.' }
+        ];
+    }
+
+    populateAddSectionModal() {
+        const grid = document.getElementById('addSectionGrid');
+        if (!grid) return;
+        const types = this.getAllSectionTypes();
+        grid.innerHTML = types.map(item => `
+            <div class="wfe-section-card" data-type="${item.type}" data-cat="${item.category}">
+                <div class="wfe-section-card-icon">${item.icon}</div>
+                <div class="wfe-section-card-title">${item.name}</div>
+                <div class="wfe-section-card-desc">${item.desc}</div>
+            </div>
+        `).join('');
+
+        grid.querySelectorAll('.wfe-section-card').forEach(card => {
+            card.addEventListener('click', () => {
+                if (!this.addSectionTarget) return;
+                const type = card.dataset.type;
+                this.addSectionToPage(this.addSectionTarget.pageId, type, this.addSectionTarget.insertIndex);
+                this.closeAddSectionModal();
+            });
+        });
+    }
+
+    filterAddSectionGrid(query) {
+        const q = (query || '').toLowerCase().trim();
+        const cards = document.querySelectorAll('.wfe-section-card');
+        cards.forEach(card => {
+            const title = (card.querySelector('.wfe-section-card-title')?.textContent || '').toLowerCase();
+            const desc = (card.querySelector('.wfe-section-card-desc')?.textContent || '').toLowerCase();
+            const type = (card.dataset.type || '').toLowerCase();
+            const matches = !q || title.includes(q) || desc.includes(q) || type.includes(q);
+            card.style.display = matches ? '' : 'none';
+        });
+    }
+
+    filterAddSectionCategory(cat) {
+        const cards = document.querySelectorAll('.wfe-section-card');
+        cards.forEach(card => {
+            const matches = cat === 'all' || card.dataset.cat === cat;
+            card.style.display = matches ? '' : 'none';
+        });
+    }
+
+    createDefaultSection(type, pageId) {
+        const page = window.stateManager ? window.stateManager.findPageById(pageId) : null;
+        const pageName = page ? page.name : 'Page';
+
+        switch (type) {
+            case 'navbar':
+            case 'mega-menu':
+            case 'dropdown-nav':
+            case 'mobile-drawer':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: type,
+                    title: 'BrandLogo',
+                    layoutVariant: type === 'mega-menu' ? 'mega-menu' : (type === 'mobile-drawer' ? 'mobile-drawer' : 'standard'),
+                    items: [
+                        { label: 'Home', url: '#' },
+                        { label: 'Features', url: '#' },
+                        { label: 'Pricing', url: '#' },
+                        { label: 'About', url: '#' },
+                        { label: 'Contact', url: '#' }
+                    ],
+                    buttonText: 'Get Started'
+                };
+
+            case 'hero':
+            case 'hero-centered':
+            case 'hero-product':
+            case 'hero-cta':
+            case 'hero-asymmetric':
+            case 'hero-full-bg':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: type,
+                    title: `Transform Your Experience on ${pageName}`,
+                    description: `Empower your workflow with intuitive, automated architecture designed to scale seamlessly.`,
+                    layoutVariant: type.replace('hero-', '') || 'split-right',
+                    buttonText: 'Start Free Trial',
+                    items: [
+                        { title: 'Interactive Wireframing' },
+                        { title: 'Responsive Canvas' },
+                        { title: 'Instant React Export' }
+                    ]
+                };
+
+            case 'features':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'features',
+                    title: 'Engineered for Performance and Precision',
+                    description: 'Explore the key capabilities that streamline your production design workflow.',
+                    layoutVariant: 'layout-grid-3',
+                    items: [
+                        { title: 'Fast AI Architecture', desc: 'Generate multi-page websites and hierarchies in seconds with deep context.', icon: 'Zap' },
+                        { title: 'Responsive Viewports', desc: 'Preview desktop, tablet, and mobile breakpoints with adaptive grid collapses.', icon: 'Smartphone' },
+                        { title: 'Component Library', desc: 'Access 32 canonical section components modeled on industry standards.', icon: 'Layers' },
+                        { title: 'Live In-Place Editing', desc: 'Edit headings, copy, and button labels with immediate two-way synchronization.', icon: 'Edit3' },
+                        { title: 'Reliable Self-Healing', desc: 'Deterministic auto-repairs guarantee zero-crash visual rendering.', icon: 'Shield' },
+                        { title: 'Modular Code Export', desc: 'Export production Vite + React + Tailwind ZIP packages ready to ship.', icon: 'Code' }
+                    ]
+                };
+
+            case 'services':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'services',
+                    title: 'Specialized Solutions for Growth',
+                    description: 'Full-spectrum services customized to achieve measurable business outcomes.',
+                    layoutVariant: 'layout-grid-3',
+                    items: [
+                        { title: 'UI/UX Design Systems', desc: 'End-to-end wireframing, tokenization, and multi-device responsive blueprints.', icon: 'Palette', tag: 'Strategy' },
+                        { title: 'Full-Stack Engineering', desc: 'Robust Django REST backend integrated with modern reactive frontend modules.', icon: 'Cpu', tag: 'Core' },
+                        { title: 'Automation & AI', desc: 'Self-healing schemas, automated page planning, and contextual content generation.', icon: 'Sparkles', tag: 'AI' }
+                    ]
+                };
+
+            case 'products':
+            case 'product':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'products',
+                    title: 'Featured Collection',
+                    description: 'Handcrafted essentials designed for durability, style, and everyday utility.',
+                    layoutVariant: 'layout-grid-4',
+                    items: [
+                        { title: 'Studio Edition Kit', price: '$129', rating: 5, category: 'Hardware' },
+                        { title: 'Pro Workflow Desk', price: '$349', rating: 5, category: 'Furniture' },
+                        { title: 'Minimalist Keyboard', price: '$89', rating: 4, category: 'Accessories' },
+                        { title: 'Ergonomic Stand', price: '$59', rating: 5, category: 'Hardware' }
+                    ]
+                };
+
+            case 'about':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'about',
+                    title: 'We Bridge Vision and Execution',
+                    description: 'Founded with a clear purpose: to remove friction from digital product creation through automated intelligence.',
+                    layoutVariant: 'layout-split-50-50',
+                    items: [
+                        { number: '10x', label: 'Faster Prototyping' },
+                        { number: '99.9%', label: 'Schema Accuracy' },
+                        { number: '15k+', label: 'Designers Empowered' }
+                    ]
+                };
+
+            case 'testimonials':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'testimonials',
+                    title: 'Trusted by Industry Leaders',
+                    description: 'See how teams accelerate their roadmaps and deliver exceptional experiences.',
+                    layoutVariant: 'layout-grid-3',
+                    items: [
+                        { quote: 'This platform eliminated weeks of manual wireframing. The multi-page sitemap and component renderer are unmatched.', author: 'Sarah Lin', role: 'VP of Product', company: 'NovaTech', rating: 5 },
+                        { quote: 'The real-time inline editing and responsive preview made stakeholder alignment effortless.', author: 'Marcus Vance', role: 'Head of Design', company: 'Apex Digital', rating: 5 },
+                        { quote: 'Exporting directly to a clean Vite and Tailwind project saved our front-end team dozens of hours.', author: 'Elena Rostova', role: 'CTO', company: 'Sphere AI', rating: 5 }
+                    ]
+                };
+
+            case 'pricing':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'pricing',
+                    title: 'Simple, Transparent Pricing',
+                    description: 'Choose the plan that fits your growth. Upgrade or cancel anytime.',
+                    layoutVariant: 'layout-grid-3',
+                    items: [
+                        { title: 'Starter', price: '$29', period: '/month', desc: 'Essential tools for freelancers and early concepts.', features: ['Up to 5 Pages', 'Standard Component Suite', 'HTML/CSS Export'] },
+                        { title: 'Professional', price: '$79', period: '/month', desc: 'For growing teams requiring full AI automation.', isPopular: true, features: ['Unlimited Pages', 'All 32 Section Types', 'React + Tailwind ZIP Export', 'AI Section Regeneration'] },
+                        { title: 'Enterprise', price: '$199', period: '/month', desc: 'Dedicated resources, custom integrations, and SLA.', features: ['Custom Component Schemas', 'Dedicated API Gateway', '24/7 Priority Support', 'Team Collaboration'] }
+                    ]
+                };
+
+            case 'faq':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'faq',
+                    title: 'Frequently Asked Questions',
+                    description: 'Everything you need to know about the platform, architecture, and exports.',
+                    items: [
+                        { question: 'How does AI wireframe generation work?', answer: 'The engine analyzes your brief, maps parent-child page hierarchies, structures sections through formal Pydantic schemas, and renders responsive visual layouts.' },
+                        { question: 'Can I edit the generated content?', answer: 'Yes! Click directly on headings, text, or buttons to edit inline, or use the settings sidebar to adjust typography, layouts, and spacing.' },
+                        { question: 'What formats can I export my wireframes to?', answer: 'You can export complete multi-page projects to Vite + React + Tailwind CSS v4 ZIP bundles, HTML/CSS, Elementor JSON, and structured JSON.' },
+                        { question: 'Are my changes saved automatically?', answer: 'Yes. All edits, section reorderings, and layout adjustments are automatically persisted to your browser storage.' }
+                    ]
+                };
+
+            case 'team':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'team',
+                    title: 'Meet the Team Behind the Platform',
+                    description: 'Passionate builders, designers, and engineers dedicated to intuitive design automation.',
+                    layoutVariant: 'layout-grid-4',
+                    items: [
+                        { name: 'Alex Rivera', role: 'Founder & CEO', bio: 'Former Product Architect leading design systems and automation.' },
+                        { name: 'Priya Sharma', role: 'Chief Technology Officer', bio: 'Specialist in distributed AI pipelines and deterministic schemas.' },
+                        { name: 'David Kim', role: 'Head of Product Design', bio: 'Focused on multi-device responsiveness and UX component libraries.' },
+                        { name: 'Chloe Dubois', role: 'Lead Frontend Engineer', bio: 'Passionate about performant DOM rendering and reactive state.' }
+                    ]
+                };
+
+            case 'gallery':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'gallery',
+                    title: 'Work Showcase & Gallery',
+                    description: 'A curated selection of wireframe architectures and responsive designs.',
+                    layoutVariant: 'layout-grid-3',
+                    items: [
+                        { title: 'SaaS Platform Redesign', category: 'Product' },
+                        { title: 'Mobile E-Commerce Flow', category: 'Mobile' },
+                        { title: 'Enterprise Portal', category: 'Dashboard' },
+                        { title: 'Brand Identity Blueprint', category: 'Design' },
+                        { title: 'Editorial Publication', category: 'Content' },
+                        { title: 'Healthcare Portal Flow', category: 'App' }
+                    ]
+                };
+
+            case 'stats':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'stats',
+                    title: 'Proven Track Record of Scale',
+                    description: 'Key metrics achieved across global production deployments.',
+                    layoutVariant: 'layout-grid-4',
+                    items: [
+                        { number: '99.98%', label: 'Uptime Reliability' },
+                        { number: '40ms', label: 'Avg Render Latency' },
+                        { number: '1.2M+', label: 'Generated Wireframes' },
+                        { number: '85+', label: 'Countries Served' }
+                    ]
+                };
+
+            case 'contact':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'contact',
+                    title: 'Get in Touch with Our Team',
+                    description: 'Have questions or need assistance? Send us a message and we will respond promptly.',
+                    buttonText: 'Send Message',
+                    items: [
+                        { icon: 'MapPin', title: 'Headquarters', desc: '100 Innovation Way, Suite 400, San Francisco, CA' },
+                        { icon: 'Mail', title: 'Email Support', desc: 'contact@wireframe-ai.platform' },
+                        { icon: 'Phone', title: 'Phone Direct', desc: '+1 (555) 019-2834' }
+                    ]
+                };
+
+            case 'cta':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'cta',
+                    title: 'Ready to Accelerate Your Website Workflow?',
+                    description: 'Start building production-grade wireframes in minutes. No credit card required.',
+                    buttonText: 'Get Started for Free',
+                    layoutVariant: 'layout-centered'
+                };
+
+            case 'footer':
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: 'footer',
+                    title: 'Platform',
+                    description: 'Automating modern web architecture and visual wireframing with intelligent agents.',
+                    copyright: `© ${new Date().getFullYear()} Wireframe AI Platform. All rights reserved.`,
+                    columns: [
+                        { title: 'Product', links: ['Sitemap Generator', 'Wireframe Studio', 'React Export', 'Changelog'] },
+                        { title: 'Resources', links: ['Documentation', 'Component Library', 'Design Tokens', 'API Reference'] },
+                        { title: 'Company', links: ['About Us', 'Careers', 'Privacy Policy', 'Contact'] }
+                    ]
+                };
+
+            default:
+                return {
+                    id: `sec-${Date.now()}`,
+                    type: type || 'content',
+                    title: `${(type || 'Section').charAt(0).toUpperCase() + (type || 'Section').slice(1)} Block`,
+                    description: `Contextual wireframe component configured for ${pageName}.`,
+                    buttonText: 'Learn More',
+                    layoutVariant: 'layout-default',
+                    items: [
+                        { title: 'Core Functionality', desc: 'Customizable section tailored to page requirements.' },
+                        { title: 'Consistent Layout', desc: 'Aligned with global typography, spacing, and brand styling.' }
+                    ]
+                };
+        }
+    }
+
+    addSectionToPage(pageId, sectionType, atIndex = null) {
+        if (!window.stateManager) return;
+        const newSection = this.createDefaultSection(sectionType, pageId);
+        window.stateManager.addSection(pageId, newSection, atIndex);
+        this.refreshPageColumn(pageId);
+        this.showNotification(`Added new ${sectionType} section`);
+    }
+
+    createInsertDivider(pageId, atIndex) {
+        const div = document.createElement('div');
+        div.className = 'section-insert-divider';
+        div.title = 'Insert section here';
+        div.innerHTML = `<button class="insert-section-btn">+ Add Section</button>`;
+        div.querySelector('.insert-section-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.openAddSectionModal(pageId, atIndex);
+        });
+        return div;
+    }
+
+    // Section Reordering
+    moveSectionUp(pageId, index) {
+        if (index > 0) {
+            this.reorderSections(pageId, index, index - 1);
+        }
+    }
+
+    moveSectionDown(pageId, index) {
+        const page = window.stateManager ? window.stateManager.findPageById(pageId) : null;
+        if (page && page.sections && index < page.sections.length - 1) {
+            this.reorderSections(pageId, index, index + 1);
+        }
+    }
+
+    reorderSections(pageId, fromIndex, toIndex) {
+        if (!window.stateManager) return;
+        const success = window.stateManager.reorderSections(pageId, fromIndex, toIndex);
+        if (success) {
+            this.refreshPageColumn(pageId);
+            this.showNotification(`Section moved ${fromIndex < toIndex ? 'down' : 'up'}`);
+        }
+    }
+
+    // Section Regeneration
+    async regenerateSection(pageId, index) {
+        if (!window.stateManager) return;
+        const page = window.stateManager.findPageById(pageId);
+        if (!page || !page.sections || !page.sections[index]) return;
+
+        const section = page.sections[index];
+        const sectionEl = document.querySelector(`.wireframe-section[data-page-id="${pageId}"][data-section-index="${index}"]`);
+
+        // Show spinner overlay
+        let loadingOverlay = null;
+        if (sectionEl) {
+            loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'wfe-section-loading';
+            loadingOverlay.innerHTML = `
+                <div class="wfe-spinner"></div>
+                <span>Regenerating ${section.type || 'section'}...</span>
+            `;
+            sectionEl.appendChild(loadingOverlay);
+        }
+
+        try {
+            const sitemap = window.stateManager.getSitemap() || {};
+            const payload = {
+                title: section.title || '',
+                type: section.type || 'content',
+                page_context: {
+                    page_id: page.id,
+                    page_name: page.name,
+                    page_path: page.path || page.name
+                },
+                brief: sitemap.brief || {}
+            };
+
+            let updatedSectionData = null;
+
+            try {
+                const response = await fetch('/api/regenerate-section/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.success && data.section) {
+                    updatedSectionData = data.section;
+                }
+            } catch (networkErr) {
+                console.warn('Backend regenerate-section offline, using deterministic generator:', networkErr);
+            }
+
+            if (!updatedSectionData) {
+                updatedSectionData = this.getMockContent(section.type, page.name);
+            }
+
+            // Merge regenerated fields while preserving unrelated user edits (custom layout/styles)
+            if (updatedSectionData.title) section.title = updatedSectionData.title;
+            if (updatedSectionData.description) section.description = updatedSectionData.description;
+            if (updatedSectionData.buttonText) section.buttonText = updatedSectionData.buttonText;
+            if (updatedSectionData.items && Array.isArray(updatedSectionData.items)) {
+                section.items = updatedSectionData.items;
+            }
+
+            window.stateManager.updateSection(pageId, index, section);
+
+            // Re-render section content in DOM
+            if (sectionEl) {
+                const newContent = this.createSectionContent(section, index, pageId);
+                const oldContent = sectionEl.querySelector('.section-content');
+                if (oldContent && oldContent.parentNode === sectionEl) {
+                    oldContent.replaceWith(newContent);
+                }
+                this.bindSectionEvents(sectionEl, section, index, pageId, page.sections.length);
+            }
+
+            // Sync sidebar if active
+            if (this.activeSection && this.activeSection.pageId === pageId && this.activeSection.index === index) {
+                const titleInput = document.getElementById('sectionNameInput');
+                if (titleInput) titleInput.value = section.title || '';
+                const descInput = document.getElementById('sectionDescInput');
+                if (descInput) descInput.value = section.description || '';
+                const btnInput = document.getElementById('buttonLabelInput');
+                if (btnInput) btnInput.value = section.buttonText || '';
+            }
+
+            this.showNotification(`✦ Section regenerated successfully`);
+        } catch (err) {
+            console.error('Error regenerating section:', err);
+            this.showNotification('Could not regenerate section', true);
+        } finally {
+            if (loadingOverlay && loadingOverlay.parentNode) {
+                loadingOverlay.remove();
+            }
+        }
+    }
+
+    // Page Regeneration (Preserves all other pages and their user edits)
+    async regeneratePage(pageId) {
+        if (!window.stateManager) return;
+        const page = window.stateManager.findPageById(pageId);
+        if (!page) return;
+
+        if (!confirm(`Regenerate all wireframe sections for "${page.name}"?`)) return;
+
+        const column = document.querySelector(`.wireframe-page-column[data-page-id="${pageId}"]`);
+        let loadingOverlay = null;
+        if (column) {
+            loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'wfe-section-loading';
+            loadingOverlay.innerHTML = `
+                <div class="wfe-spinner"></div>
+                <span>Regenerating wireframe for ${page.name}...</span>
+            `;
+            column.appendChild(loadingOverlay);
+        }
+
+        try {
+            const sitemap = window.stateManager.getSitemap() || {};
+            let newSections = null;
+
+            try {
+                const response = await fetch('/api/generate-wireframe/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sitemap_data: sitemap,
+                        page_id: pageId
+                    })
+                });
+                const data = await response.json();
+                if (data.success && data.wireframes && data.wireframes.pages) {
+                    const matchedPage = data.wireframes.pages.find(p => String(p.page_id) === String(pageId));
+                    if (matchedPage && matchedPage.sections) {
+                        newSections = matchedPage.sections;
+                    }
+                }
+            } catch (networkErr) {
+                console.warn('Backend generate-wireframe offline, generating client fallback:', networkErr);
+            }
+
+            if (!newSections) {
+                newSections = this.generateFallbackSectionsForPage(page);
+            }
+
+            // CRITICAL: Update ONLY this page's sections, preserving all other pages and user edits
+            page.sections = newSections;
+            window.stateManager.updatePage(pageId, page);
+            this.refreshPageColumn(pageId);
+            this.showNotification(`↻ Page "${page.name}" regenerated successfully`);
+        } catch (err) {
+            console.error('Error regenerating page:', err);
+            this.showNotification('Could not regenerate page', true);
+        } finally {
+            if (loadingOverlay && loadingOverlay.parentNode) {
+                loadingOverlay.remove();
+            }
+        }
+    }
+
+    generateFallbackSectionsForPage(page) {
+        const pageName = (page.name || '').toLowerCase();
+        const sections = [
+            this.createDefaultSection('navbar', page.id),
+            this.createDefaultSection('hero', page.id)
+        ];
+
+        if (pageName.includes('about')) {
+            sections.push(this.createDefaultSection('about', page.id));
+            sections.push(this.createDefaultSection('team', page.id));
+            sections.push(this.createDefaultSection('stats', page.id));
+        } else if (pageName.includes('service')) {
+            sections.push(this.createDefaultSection('services', page.id));
+            sections.push(this.createDefaultSection('process', page.id));
+            sections.push(this.createDefaultSection('testimonials', page.id));
+        } else if (pageName.includes('product') || pageName.includes('shop') || pageName.includes('store')) {
+            sections.push(this.createDefaultSection('products', page.id));
+            sections.push(this.createDefaultSection('features', page.id));
+            sections.push(this.createDefaultSection('faq', page.id));
+        } else if (pageName.includes('pricing')) {
+            sections.push(this.createDefaultSection('pricing', page.id));
+            sections.push(this.createDefaultSection('testimonials', page.id));
+            sections.push(this.createDefaultSection('faq', page.id));
+        } else if (pageName.includes('contact')) {
+            sections.push(this.createDefaultSection('contact', page.id));
+            sections.push(this.createDefaultSection('faq', page.id));
+        } else {
+            sections.push(this.createDefaultSection('features', page.id));
+            sections.push(this.createDefaultSection('testimonials', page.id));
+            sections.push(this.createDefaultSection('pricing', page.id));
+        }
+
+        sections.push(this.createDefaultSection('cta', page.id));
+        sections.push(this.createDefaultSection('footer', page.id));
+        return sections;
+    }
+
+    generateFallbackWireframesForAllPages() {
+        if (!window.stateManager || !window.stateManager.getSitemap()) return;
+        const sitemap = window.stateManager.getSitemap();
+        if (sitemap.pages && Array.isArray(sitemap.pages)) {
+            sitemap.pages.forEach(p => {
+                p.sections = this.generateFallbackSectionsForPage(p);
+            });
+            window.stateManager.saveToLocalStorage();
+            this.renderAllPages(sitemap);
+            this.showNotification('✓ Generated wireframes for all pages');
+        }
+    }
+
+    showNotification(message, isError = false) {
+        const existing = document.querySelector('.wfe-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'wfe-toast';
+        if (isError) {
+            toast.style.background = '#ef4444';
+        }
+        toast.innerHTML = `<span>${message}</span>`;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            if (toast && toast.parentNode) {
+                toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(12px)';
+                setTimeout(() => toast.remove(), 300);
+            }
+        }, 2500);
+    }
+
     // Render all pages side-by-side
     renderAllPages(sitemap) {
         console.log('🎨 renderAllPages called with sitemap:', sitemap);
@@ -1361,9 +2136,16 @@ class WireframeEditor {
         if (sitemap && sitemap.pages && sitemap.pages.length > 0) {
             const flatPages = this.flattenPagesWithPath(sitemap.pages);
             console.log(`📄 Rendering ${flatPages.length} pages...`);
+            const pageSelect = document.getElementById('pageSelectDropdown');
+            if (pageSelect) {
+                pageSelect.innerHTML = `<option value="all">All Pages (${flatPages.length})</option>` +
+                    flatPages.map(item => `<option value="${item.page.id}">${item.page.name || 'Untitled'}</option>`).join('');
+                if (this.currentPageId) pageSelect.value = this.currentPageId;
+            }
             flatPages.forEach((item, index) => {
                 console.log(`  - Rendering page ${index + 1}: ${item.page.name}`);
                 const column = this.createPageColumn(item.page, item.path);
+                if (this.currentPageId && String(item.page.id) === String(this.currentPageId)) column.classList.add('active-page-column');
                 board.appendChild(column);
             });
             console.log('✅ All pages rendered successfully');
@@ -1392,6 +2174,114 @@ class WireframeEditor {
     }
 
     createPageColumn(page, pagePath = '') {
+        const column = document.createElement('div');
+        column.className = 'wireframe-page-column';
+        column.dataset.pageId = page.id;
+
+        // Add click handler for page selection
+        column.addEventListener('click', (e) => {
+            if (e.target.closest('.section-toolbar') || e.target.closest('.section-insert-divider') || e.target.closest('.page-header-actions')) {
+                return;
+            }
+            this.switchToPage(page.id);
+        });
+
+        const sections = page.sections || [];
+
+        // Header with Page info and action buttons
+        const header = document.createElement('div');
+        header.className = 'page-column-header';
+        header.innerHTML = `
+            <div class="page-header-info">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <h3 class="page-column-title">${page.name || 'Untitled Page'}</h3>
+                    <span class="page-section-count-badge">${sections.length} sections</span>
+                </div>
+                ${pagePath ? `<div class="page-column-path">${pagePath}</div>` : ''}
+            </div>
+            <div class="page-header-actions">
+                <button class="page-action-btn page-regen-btn" title="Regenerate all wireframe sections for this page">
+                    ↻ Regenerate
+                </button>
+                <button class="page-action-btn primary page-add-btn" title="Add a section to this page">
+                    + Add Section
+                </button>
+            </div>
+        `;
+
+        // Bind header buttons
+        const regenBtn = header.querySelector('.page-regen-btn');
+        if (regenBtn) {
+            regenBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.regeneratePage(page.id);
+            });
+        }
+
+        const addBtn = header.querySelector('.page-add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openAddSectionModal(page.id, null);
+            });
+        }
+
+        column.appendChild(header);
+
+        // Content Container
+        const content = document.createElement('div');
+        content.className = 'page-column-content';
+
+        // Sections
+        if (sections.length > 0) {
+            sections.forEach((section, index) => {
+                // Insert Divider above section
+                const divider = this.createInsertDivider(page.id, index);
+                content.appendChild(divider);
+
+                const sectionElement = this.createEditableSection(section, index, page.id, sections.length);
+                content.appendChild(sectionElement);
+            });
+            // Final divider at bottom
+            const finalDivider = this.createInsertDivider(page.id, sections.length);
+            content.appendChild(finalDivider);
+        } else {
+            // Empty state for column
+            const empty = document.createElement('div');
+            empty.className = 'column-empty-state';
+            empty.innerHTML = `
+                <div style="padding: 32px 16px; text-align: center; color: #94a3b8; border: 2px dashed #e2e8f0; border-radius: 8px; margin: 20px;">
+                    <p style="margin: 0 0 12px; font-size: 14px; font-weight: 600;">No sections generated yet</p>
+                    <button class="page-action-btn primary page-add-btn">+ Add First Section</button>
+                </div>
+            `;
+            const emptyAddBtn = empty.querySelector('.page-add-btn');
+            if (emptyAddBtn) {
+                emptyAddBtn.addEventListener('click', () => this.openAddSectionModal(page.id, 0));
+            }
+            content.appendChild(empty);
+        }
+
+        // Add section bottom card
+        const bottomCard = document.createElement('div');
+        bottomCard.className = 'add-section-bottom-card';
+        bottomCard.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Add Section to ${page.name || 'Page'}</span>
+        `;
+        bottomCard.addEventListener('click', () => {
+            this.openAddSectionModal(page.id, sections.length);
+        });
+        content.appendChild(bottomCard);
+
+        column.appendChild(content);
+        return column;
+    }
+
+    createPageColumn_old(page, pagePath = '') {
         const column = document.createElement('div');
         column.className = 'wireframe-page-column';
         column.dataset.pageId = page.id;
@@ -1464,7 +2354,52 @@ class WireframeEditor {
         this.refreshPageColumn(pageId);
     }
     // Create editable section element
-    createEditableSection(section, index, pageId) {
+    createEditableSection(section, index, pageId, totalSections = null) {
+        const sectionEl = document.createElement('div');
+        const sectionType = (section.type || 'generic').toLowerCase();
+        sectionEl.className = `wireframe-section ${sectionType} ${this.editMode ? 'edit-mode' : ''}`;
+        sectionEl.dataset.sectionIndex = index;
+        sectionEl.dataset.pageId = pageId;
+
+        const page = window.stateManager ? window.stateManager.findPageById(pageId) : null;
+        const total = totalSections !== null ? totalSections : (page && page.sections ? page.sections.length : 1);
+
+        // Apply saved styles if they exist
+        if (section.styles) {
+            this.applyStylesToElement(sectionEl, section.styles);
+        }
+
+        // Set contentEditable state
+        sectionEl.querySelectorAll('.editable-text').forEach(el => {
+            el.contentEditable = this.editMode;
+        });
+
+        // Enhanced Section controls
+        const controls = document.createElement('div');
+        controls.className = 'section-toolbar';
+        controls.innerHTML = `
+            <span class="toolbar-drag-handle" title="Section ${index + 1}">⋮⋮</span>
+            <span class="section-label">${section.type || 'Section'}</span>
+            <button class="toolbar-btn move-up-btn" title="Move Up" ${index === 0 ? 'disabled' : ''}>↑</button>
+            <button class="toolbar-btn move-down-btn" title="Move Down" ${index >= total - 1 ? 'disabled' : ''}>↓</button>
+            <button class="toolbar-btn regen-btn" title="Regenerate section content with AI">✦</button>
+            <button class="toolbar-btn section-btn" title="Layout & Options">⚙</button>
+            <button class="toolbar-btn btn-danger delete-btn" title="Delete Section">×</button>
+        `;
+
+        // Section content
+        const content = this.createSectionContent(section, index, pageId);
+
+        sectionEl.appendChild(controls);
+        sectionEl.appendChild(content);
+
+        // Bind events
+        this.bindSectionEvents(sectionEl, section, index, pageId, total);
+
+        return sectionEl;
+    }
+
+    createEditableSection_old(section, index, pageId) {
         const sectionEl = document.createElement('div');
         // Ensure type is lowercase for CSS matching
         const sectionType = (section.type || 'generic').toLowerCase();
@@ -1571,6 +2506,12 @@ class WireframeEditor {
         section.pageId = pageId;
         section.index = index;
 
+        // Use Phase 5 WireframeComponents modular library when available
+        if (window.WireframeComponents && typeof window.WireframeComponents.renderComponent === 'function') {
+            content.innerHTML = window.WireframeComponents.renderComponent(section);
+            return content;
+        }
+
         const type = (section.type || '').toLowerCase();
         const title = (section.title || '').toLowerCase();
         const variant = section.layoutVariant || 'layout-default';
@@ -1603,8 +2544,8 @@ class WireframeEditor {
         const travelTypes = [
             'search-form', 'filters', 'promo', 'results', 'sorting',
             'fare-details', 'seat-selection', 'passenger-form', 'special-requests',
-            'addons', 'pricing', 'order-summary', 'gst', 'payment', 'terms', 'policies',
-            'offers', 'trust', 'trip-types', 'auth', 'stats', 'management', 'support', 'summary'
+            'addons', 'order-summary', 'gst', 'payment', 'terms', 'policies',
+            'offers', 'trust', 'trip-types', 'auth', 'management', 'support', 'summary'
         ];
         if (travelTypes.includes(type)) return true;
         const t = title || '';
@@ -3583,7 +4524,85 @@ class WireframeEditor {
     }
 
     // Bind events to section elements
-    bindSectionEvents(sectionEl, section, index, pageId) {
+    bindSectionEvents(sectionEl, section, index, pageId, totalSections = null) {
+        const page = window.stateManager ? window.stateManager.findPageById(pageId) : null;
+        const total = totalSections !== null ? totalSections : (page && page.sections ? page.sections.length : 1);
+
+        // Move Up button
+        const moveUpBtn = sectionEl.querySelector('.move-up-btn');
+        if (moveUpBtn) {
+            moveUpBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (index > 0) this.moveSectionUp(pageId, index);
+            });
+        }
+
+        // Move Down button
+        const moveDownBtn = sectionEl.querySelector('.move-down-btn');
+        if (moveDownBtn) {
+            moveDownBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (index < total - 1) this.moveSectionDown(pageId, index);
+            });
+        }
+
+        // Regenerate section button
+        const regenBtn = sectionEl.querySelector('.regen-btn');
+        if (regenBtn) {
+            regenBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.regenerateSection(pageId, index);
+            });
+        }
+
+        // Section button (open layout options)
+        const sectionBtn = sectionEl.querySelector('.section-btn');
+        if (sectionBtn) {
+            sectionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openLayoutOptions(section, index, pageId, sectionEl);
+            });
+        }
+
+        // Delete button
+        const deleteBtn = sectionEl.querySelector('.delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteSection(pageId, index);
+            });
+        }
+
+        // Direct Inline Text Editing
+        sectionEl.querySelectorAll('.editable-text').forEach(textEl => {
+            textEl.contentEditable = "true";
+            textEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectSection(section, index, pageId, sectionEl);
+            });
+            textEl.addEventListener('input', (e) => {
+                this.handleInlineEdit(e.target);
+            });
+            textEl.addEventListener('blur', (e) => {
+                this.handleInlineEdit(e.target);
+            });
+            textEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !textEl.dataset.field?.includes('desc')) {
+                    e.preventDefault();
+                    textEl.blur();
+                }
+            });
+        });
+
+        // Click on section to select it
+        sectionEl.addEventListener('click', (e) => {
+            if (!e.target.closest('.toolbar-btn')) {
+                this.selectSection(section, index, pageId, sectionEl);
+            }
+        });
+    }
+
+    bindSectionEvents_old(sectionEl, section, index, pageId) {
         // Section button (open layout options)
         const sectionBtn = sectionEl.querySelector('.section-btn');
         if (sectionBtn) {
@@ -4654,6 +5673,19 @@ STRUCTURE: [structure description]
             const updates = {};
             updates[field] = value;
             this.activeSection.section[field] = value;
+            const el = this.activeSection.element;
+            if (el && typeof el.querySelector === 'function') {
+                if (field === 'title') {
+                    const titleEl = el.querySelector('[data-field="title"]');
+                    if (titleEl) titleEl.textContent = value;
+                } else if (field === 'description') {
+                    const descEl = el.querySelector('[data-field="description"]');
+                    if (descEl) descEl.textContent = value;
+                } else if (field === 'buttonText') {
+                    const btn = el.querySelector('.cta-button, .btn');
+                    if (btn) btn.textContent = value;
+                }
+            }
             window.stateManager.updateSection(this.activeSection.pageId, this.activeSection.index, updates);
         }
     }
@@ -4994,7 +6026,7 @@ STRUCTURE: [structure description]
             if (sectionEl) {
                 const newContent = this.createSectionContent(data.section, data.sectionIndex, data.pageId);
                 const oldContent = sectionEl.querySelector('.section-content');
-                if (oldContent) {
+                if (oldContent && oldContent.parentNode === sectionEl) {
                     oldContent.replaceWith(newContent);
                     this.bindSectionEvents(sectionEl, data.section, data.sectionIndex, data.pageId);
                     if (data.section.styles) {
@@ -5072,3 +6104,9 @@ STRUCTURE: [structure description]
 }
 
 // Do not auto-instantiate here; initialization is handled in wireframe.html
+
+// Support both browser and Node.js module loading for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { WireframeEditor };
+}
+

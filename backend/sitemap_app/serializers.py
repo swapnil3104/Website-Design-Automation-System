@@ -32,3 +32,8 @@ class PromptSerializer(serializers.Serializer):
 
 class SitemapUpdateSerializer(serializers.Serializer):
     sitemap_data = serializers.JSONField()
+
+    def validate_sitemap_data(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("sitemap_data must be a dictionary object.")
+        return value

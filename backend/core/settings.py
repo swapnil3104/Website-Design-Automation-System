@@ -22,7 +22,7 @@ FRONTEND_DIR = BASE_DIR.parent / 'frontend'
 SECRET_KEY = config.secret_key
 DEBUG = True
 
-ALLOWED_HOSTS = config.allowed_hosts
+ALLOWED_HOSTS = list(set(config.allowed_hosts + ['testserver', 'localhost', '127.0.0.1']))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -119,15 +119,14 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
-        'file': {
+        'console': {
             'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'django_error.log',
+            'class': 'logging.StreamHandler',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': True,
         },

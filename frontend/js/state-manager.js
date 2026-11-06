@@ -27,6 +27,7 @@ class StateManager {
         }
 
         this.sitemap = sitemap;
+        this.saveToLocalStorage();
         this.notifyListeners('sitemap:updated', sitemap);
     }
 
@@ -48,28 +49,36 @@ class StateManager {
     // Find a page by ID
     findPageById(pageId) {
         if (!this.sitemap || !this.sitemap.pages) return null;
-        return this.sitemap.pages.find(p => p.id === pageId);
+        return this.sitemap.pages.find(p => String(p.id) === String(pageId));
     }
 
     // Update a specific page
     updatePage(pageId, updatedPage) {
         if (!this.sitemap || !this.sitemap.pages) return;
-        const index = this.sitemap.pages.findIndex(p => p.id === pageId);
+        const index = this.sitemap.pages.findIndex(p => String(p.id) === String(pageId));
         if (index !== -1) {
             this.sitemap.pages[index] = { ...this.sitemap.pages[index], ...updatedPage };
+            this.saveToLocalStorage();
+            this.notifyListeners('page:updated', { pageId, page: this.sitemap.pages[index] });
             this.notifyListeners('sitemap:updated', this.sitemap);
         }
     }
 
-    // Add a section to a page
-    addSection(pageId, section) {
+    // Add a section to a page (optionally at a specific index)
+    addSection(pageId, section, atIndex = null) {
         const page = this.findPageById(pageId);
         if (page) {
             if (!page.sections) page.sections = [];
-            page.sections.push(section);
-            this.notifyListeners('section:added', { pageId, section });
+            const insertIndex = (atIndex !== null && atIndex >= 0 && atIndex <= page.sections.length)
+                ? atIndex
+                : page.sections.length;
+            page.sections.splice(insertIndex, 0, section);
+            this.saveToLocalStorage();
+            this.notifyListeners('section:added', { pageId, section, index: insertIndex });
             this.notifyListeners('sitemap:updated', this.sitemap);
+            return true;
         }
+        return false;
     }
 
     // Update a section
@@ -77,19 +86,41 @@ class StateManager {
         const page = this.findPageById(pageId);
         if (page && page.sections && page.sections[sectionIndex]) {
             page.sections[sectionIndex] = { ...page.sections[sectionIndex], ...updatedSection };
+            this.saveToLocalStorage();
             this.notifyListeners('section:updated', { pageId, sectionIndex, section: page.sections[sectionIndex] });
             this.notifyListeners('sitemap:updated', this.sitemap);
+            return true;
         }
+        return false;
+    }
+
+    // Reorder sections within a page
+    reorderSections(pageId, fromIndex, toIndex) {
+        const page = this.findPageById(pageId);
+        if (page && page.sections && Array.isArray(page.sections)) {
+            if (fromIndex >= 0 && fromIndex < page.sections.length && toIndex >= 0 && toIndex < page.sections.length) {
+                const [movedSection] = page.sections.splice(fromIndex, 1);
+                page.sections.splice(toIndex, 0, movedSection);
+                this.saveToLocalStorage();
+                this.notifyListeners('section:reordered', { pageId, fromIndex, toIndex, sections: page.sections });
+                this.notifyListeners('sitemap:updated', this.sitemap);
+                return true;
+            }
+        }
+        return false;
     }
 
     // Delete a section
     deleteSection(pageId, sectionIndex) {
         const page = this.findPageById(pageId);
-        if (page && page.sections) {
-            page.sections.splice(sectionIndex, 1);
-            this.notifyListeners('section:deleted', { pageId, sectionIndex });
+        if (page && page.sections && sectionIndex >= 0 && sectionIndex < page.sections.length) {
+            const [deletedSection] = page.sections.splice(sectionIndex, 1);
+            this.saveToLocalStorage();
+            this.notifyListeners('section:deleted', { pageId, sectionIndex, section: deletedSection });
             this.notifyListeners('sitemap:updated', this.sitemap);
+            return true;
         }
+        return false;
     }
 
     // Event system
@@ -110,7 +141,13 @@ class StateManager {
 
     notifyListeners(event, data) {
         if (this.listeners.has(event)) {
-            this.listeners.get(event).forEach(callback => callback(data));
+            this.listeners.get(event).forEach(callback => {
+                try {
+                    callback(data);
+                } catch (err) {
+                    console.error(`Error in stateManager listener for ${event}:`, err);
+                }
+            });
         }
     }
 
@@ -129,10 +166,21 @@ class StateManager {
         this.notifyListeners(event, data);
     }
 
-    // Save to localStorage
+    // Save to localStorage safely (runs in browser and headless Node.js)
     saveToLocalStorage() {
-        if (this.sitemap) {
-            localStorage.setItem('currentSitemap', JSON.stringify(this.sitemap));
+        if (this.sitemap && typeof localStorage !== 'undefined') {
+            try {
+                localStorage.setItem('currentSitemap', JSON.stringify(this.sitemap));
+                // Signal save event for UI indicators
+                this.notifyListeners('storage:saved', { timestamp: Date.now() });
+            } catch (e) {
+                console.warn('Unable to persist sitemap to localStorage:', e);
+            }
         }
     }
+}
+
+// Support both browser and Node.js module loading for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { StateManager };
 }

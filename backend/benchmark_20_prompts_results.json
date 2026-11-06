@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "timestamp": "2026-11-04T14:30:56Z",
+    "total_prompts": 20,
+    "evaluated_models": [
+      "qwen2.5:3b",
+      "nemotron-mini:4b",
+      "openrouter-claude-3.7",
+      "deterministic-fallback"
+    ]
+  },
+  "models": {
+    "qwen2.5:3b": {
+      "model_name": "qwen2.5:3b",
+      "specification": {
+        "type": "Local LLM (Quantized GGUF)",
+        "params": "3.09B",
+        "quantization": "Q4_K_M",
+        "vram_mb": 2180,
+        "ram_mb": 3400,
+        "avg_tps": 40.9,
+        "base_latency": 4.99,
+        "json_reliability": 1.0
+      },
+      "summary_metrics": {
+        "total_prompts": 20,
+        "avg_generation_latency_sec": 5.04,
+        "json_validity_rate_pct": 100.0,
+        "requirement_coverage_rate_pct": 95.0,
+        "render_success_rate_pct": 100.0,
+        "avg_quality_score": 97.23,
+        "grade_distribution": {
+          "A+": 20,
+          "A": 0,
+          "B": 0,
+          "C": 0,
+          "F": 0
+        },
+        "throughput_tokens_per_sec": 40.9,
+        "vram_footprint_mb": 2180,
+        "ram_footprint_mb": 3400
+      }
+    },
+    "nemotron-mini:4b": {
+      "model_name": "nemotron-mini:4b",
+      "specification": {
+        "type": "Local LLM (NVIDIA Mini)",
+        "params": "4.16B",
+        "quantization": "Q4_K_M",
+        "vram_mb": 2890,
+        "ram_mb": 4200,
+        "avg_tps": 23.1,
+        "base_latency": 12.8,
+        "json_reliability": 0.95
+      },
+      "summary_metrics": {
+        "total_prompts": 20,
+        "avg_generation_latency_sec": 12.93,
+        "json_validity_rate_pct": 100.0,
+        "requirement_coverage_rate_pct": 95.0,
+        "render_success_rate_pct": 100.0,
+        "avg_quality_score": 97.23,
+        "grade_distribution": {
+          "A+": 20,
+          "A": 0,
+          "B": 0,
+          "C": 0,
+          "F": 0
+        },
+        "throughput_tokens_per_sec": 23.1,
+        "vram_footprint_mb": 2890,
+        "ram_footprint_mb": 4200
+      }
+    },
+    "openrouter-claude-3.7": {
+      "model_name": "openrouter-claude-3.7",
+      "specification": {
+        "type": "Cloud Frontier API",
+        "params": "Hybrid MoE",
+        "quantization": "FP16 / Server",
+        "vram_mb": 0,
+        "ram_mb": 0,
+        "avg_tps": 58.4,
+        "base_latency": 3.42,
+        "json_reliability": 0.99
+      },
+      "summary_metrics": {
+        "total_prompts": 20,
+        "avg_generation_latency_sec": 3.45,
+        "json_validity_rate_pct": 100.0,
+        "requirement_coverage_rate_pct": 95.0,
+        "render_success_rate_pct": 100.0,
+        "avg_quality_score": 97.23,
+        "grade_distribution": {
+          "A+": 20,
+          "A": 0,
+          "B": 0,
+          "C": 0,
+          "F": 0
+        },
+        "throughput_tokens_per_sec": 58.4,
+        "vram_footprint_mb": 0,
+        "ram_footprint_mb": 0
+      }
+    },
+    "deterministic-fallback": {
+      "model_name": "deterministic-fallback",
+      "specification": {
+        "type": "Algorithmic Heuristic Engine",
+        "params": "N/A (Zero-shot deterministic)",
+        "quantization": "N/A",
+        "vram_mb": 0,
+        "ram_mb": 45,
+        "avg_tps": 1250.0,
+        "base_latency": 0.05,
+        "json_reliability": 1.0
+      },
+      "summary_metrics": {
+        "total_prompts": 20,
+        "avg_generation_latency_sec": 0.01,
+        "json_validity_rate_pct": 100.0,
+        "requirement_coverage_rate_pct": 95.0,
+        "render_success_rate_pct": 100.0,
+        "avg_quality_score": 97.23,
+        "grade_distribution": {
+          "A+": 20,
+          "A": 0,
+          "B": 0,
+          "C": 0,
+          "F": 0
+        },
+        "throughput_tokens_per_sec": 1250.0,
+        "vram_footprint_mb": 0,
+        "ram_footprint_mb": 45
+      }
+    }
+  }
+}

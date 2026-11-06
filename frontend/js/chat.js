@@ -460,7 +460,7 @@ class AIChat {
         questions.forEach(q => {
             const answer = this.userAnswers[q.id];
             if (answer) {
-                this.addMessage(q.text, 'ai');
+                const questionText = q.text || q.question || ''; if (questionText) this.addMessage(questionText, 'ai');
                 this.addMessage(answer, 'user');
             }
         });
@@ -482,7 +482,7 @@ class AIChat {
                 this.updateSummaryField(question.summaryField, this.normalizeAnswerValue(existingAnswer));
                 return this.nextQuestion();
             }
-            this.addMessage(question.text, 'ai');
+            const qText = question.text || question.question || ''; this.addMessage(qText, 'ai');
             this.renderOptions(question.options, question.multiSelect, question.id);
         } else {
             this.finishBrief();
@@ -775,7 +775,7 @@ class AIChat {
 
         const content = document.createElement('div');
         content.className = 'message-content';
-        content.innerHTML = text.replace(/\n/g, '<br>');
+        const safeText = text ? String(text) : ''; content.innerHTML = safeText.replace(/\n/g, '<br>');
 
         messageBubble.appendChild(content);
         this.conversationArea.appendChild(messageBubble);

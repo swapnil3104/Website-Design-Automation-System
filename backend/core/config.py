@@ -3,9 +3,12 @@ Secure configuration loader for environment variables.
 """
 
 import os
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigurationError(Exception):
@@ -43,46 +46,124 @@ class Config:
             load_dotenv()
 
     def _validate_required_vars(self) -> None:
-        if not (os.getenv('PRIVATE_KEY') or os.getenv('AI_API_KEY')):
-            raise ConfigurationError(
-                "Missing required environment variables: PRIVATE_KEY or AI_API_KEY. "
-                "Please ensure one is set in your .env file or environment."
-            )
+        provider = os.getenv('AI_PROVIDER', 'auto').strip().lower()
+        if provider == 'openrouter':
+            key = os.getenv('OPENROUTER_API_KEY') or os.getenv('AI_API_KEY') or os.getenv('PRIVATE_KEY')
+            if not key or 'xxxx' in key.lower():
+                logger.warning(
+                    "AI_PROVIDER is set to 'openrouter' but no valid OPENROUTER_API_KEY or AI_API_KEY was found."
+                )
+
+    # ---------------- Provider & Model Configurations ----------------
+
+    @property
+    def ai_provider(self) -> str:
+        """Active AI provider: 'ollama', 'openrouter', 'mock', or 'auto'."""
+        return os.getenv('AI_PROVIDER', 'auto').strip().lower()
+
+    @property
+    def ollama_base_url(self) -> str:
+        """Base endpoint for Ollama instance (default: http://localhost:11434)."""
+        raw = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').strip()
+        return raw.rstrip('/')
+
+    @property
+    def ollama_model(self) -> str:
+        """Target model tag for Ollama execution (default: qwen2.5:3b)."""
+        return os.getenv('OLLAMA_MODEL', 'qwen2.5:3b').strip()
+
+    @property
+    def openrouter_api_key(self) -> str:
+        """API key for OpenRouter."""
+        for env_name in ('OPENROUTER_API_KEY', 'AI_API_KEY', 'PRIVATE_KEY'):
+            val = os.getenv(env_name, '').strip()
+            if val and 'xxxx' not in val.lower():
+                return val
+        return ''
+
+    @property
+    def openrouter_model(self) -> str:
+        """Target model for OpenRouter."""
+        return (
+            os.getenv('OPENROUTER_MODEL')
+            or os.getenv('AI_MODEL')
+            or os.getenv('CHAT_AI_MODEL')
+            or 'anthropic/claude-3.7-sonnet'
+        ).strip()
+
+    @property
+    def openrouter_base_url(self) -> str:
+        """Base API URL for OpenRouter completions."""
+        return os.getenv(
+            'OPENROUTER_BASE_URL',
+            os.getenv('AI_BASE_URL', 'https://openrouter.ai/api/v1/chat/completions')
+        ).strip()
+
+    @property
+    def openrouter_fallback_models(self) -> List[str]:
+        """Ordered list of fallback models when OpenRouter primary model fails."""
+        raw = os.getenv('OPENROUTER_FALLBACK_MODELS') or os.getenv('CHAT_AI_FALLBACK_MODELS', '')
+        if not raw:
+            return ['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1', 'deepseek/deepseek-v3.2']
+        return [m.strip() for m in raw.split(',') if m.strip()]
+
+    # ---------------- Execution & Timeout Settings ----------------
+
+    @property
+    def ai_timeout_seconds(self) -> int:
+        """Timeout for AI completion requests in seconds."""
+        try:
+            return int(os.getenv('AI_TIMEOUT_SECONDS', '45'))
+        except (ValueError, TypeError):
+            return 45
+
+    @property
+    def ai_max_retries(self) -> int:
+        """Maximum retry attempts for transient AI provider errors."""
+        try:
+            return int(os.getenv('AI_MAX_RETRIES', '3'))
+        except (ValueError, TypeError):
+            return 3
+
+    @property
+    def ai_retry_delay(self) -> float:
+        """Initial retry delay in seconds (exponential backoff base)."""
+        try:
+            return float(os.getenv('AI_RETRY_DELAY', '1.5'))
+        except (ValueError, TypeError):
+            return 1.5
+
+    @property
+    def ai_temperature(self) -> float:
+        """Default temperature for AI generation."""
+        try:
+            return float(os.getenv('AI_TEMPERATURE', '0.2'))
+        except (ValueError, TypeError):
+            return 0.2
+
+    @property
+    def ai_max_tokens(self) -> int:
+        """Default maximum token generation length."""
+        try:
+            return int(os.getenv('AI_MAX_TOKENS', '4096'))
+        except (ValueError, TypeError):
+            return 4096
+
+    # ---------------- Legacy Compatibility Properties ----------------
 
     @property
     def private_key(self) -> str:
-        def _valid_key(val: str) -> bool:
-            if not val:
-                return False
-            return 'xxxx' not in val.lower()
-
-        key = os.getenv('PRIVATE_KEY') if _valid_key(os.getenv('PRIVATE_KEY', '')) else ''
-        if not key:
-            key = os.getenv('AI_API_KEY') if _valid_key(os.getenv('AI_API_KEY', '')) else ''
-        if not key:
-            raise ConfigurationError(
-                "PRIVATE_KEY is not configured. Please set it in your .env file."
-            )
-        return key
+        """Legacy accessor. Always returns openrouter_api_key."""
+        return self.openrouter_api_key
 
     @property
     def ai_api_key(self) -> str:
-        def _valid_key(val: str) -> bool:
-            if not val:
-                return False
-            return 'xxxx' not in val.lower()
-
-        ai_key = os.getenv('AI_API_KEY', '')
-        if _valid_key(ai_key):
-            return ai_key
-        private_key = os.getenv('PRIVATE_KEY', '')
-        if _valid_key(private_key):
-            return private_key
-        return ai_key or private_key
+        """Legacy accessor for API key."""
+        return self.openrouter_api_key
 
     @property
     def ai_base_url(self) -> str:
-        return os.getenv('AI_BASE_URL', 'https://openrouter.ai/api/v1/chat/completions')
+        return self.openrouter_base_url
 
     @property
     def ai_http_referer(self) -> str:
@@ -94,43 +175,36 @@ class Config:
 
     @property
     def chat_ai_base_url(self) -> str:
-        return os.getenv('CHAT_AI_BASE_URL', self.ai_base_url)
+        return os.getenv('CHAT_AI_BASE_URL', self.openrouter_base_url)
 
     @property
     def wireframe_ai_base_url(self) -> str:
-        return os.getenv('WIREFRAME_AI_BASE_URL', self.ai_base_url)
+        return os.getenv('WIREFRAME_AI_BASE_URL', self.openrouter_base_url)
 
     @property
     def chat_ai_model(self) -> str:
-        return (
-            os.getenv('CHAT_AI_MODEL')
-            or os.getenv('AI_MODEL_CHAT')
-            or os.getenv('AI_MODEL')
-            or 'meta-llama/llama-3.2-3b-instruct:free'
-        )
+        return self.openrouter_model
 
     @property
-    def chat_ai_fallback_models(self) -> list:
-        raw = os.getenv('CHAT_AI_FALLBACK_MODELS', '')
-        if not raw:
-            return ['google/gemini-2.0-flash-lite-preview-02-05:free', 'qwen/qwen-2.5-72b-instruct:free']
-        return [m.strip() for m in raw.split(',') if m.strip()]
+    def chat_ai_fallback_models(self) -> List[str]:
+        return self.openrouter_fallback_models
 
     @property
     def wireframe_ai_model(self) -> str:
         return (
             os.getenv('WIREFRAME_AI_MODEL')
             or os.getenv('AI_MODEL_WIREFRAME')
-            or os.getenv('AI_MODEL')
-            or 'meta-llama/llama-3.2-3b-instruct:free'
+            or self.openrouter_model
         )
 
     @property
     def chat_ai_enabled(self) -> bool:
         value = os.getenv('CHAT_AI_ENABLED')
         if value is None:
-            return bool(self.ai_api_key)
+            return True
         return value.lower() in ('true', '1', 'yes')
+
+    # ---------------- Django App Settings ----------------
 
     @property
     def secret_key(self) -> str:
@@ -158,3 +232,4 @@ config = Config()
 
 def get_private_key() -> str:
     return config.private_key
+

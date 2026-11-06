@@ -6,11 +6,21 @@ import urllib.request
 import urllib.error
 from typing import Dict, List, Any
 from core.config import config
+from .providers import CompletionRequest, execute_completion_with_fallback, get_ai_provider
+from .schemas import (
+    SitemapModel,
+    SitemapPageModel,
+    SitemapSectionModel,
+    BriefContextModel,
+    validate_sitemap,
+    repair_sitemap,
+)
+from .analyzer import RequirementAnalyzer
+from .sitemap_service import SitemapService
+from .wireframe_service import WireframeService
 
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+
+
 
 
 class SitemapGenerator:
@@ -18,6 +28,8 @@ class SitemapGenerator:
     
     def __init__(self):
         self.last_ai_error = None
+        self.service = SitemapService()
+        self.analyzer = self.service.analyzer
         # Common page types and their typical sections
         self.page_types = {
             'home': {
@@ -476,21 +488,6 @@ class SitemapGenerator:
         enabled = config.chat_ai_enabled if ai_enabled is None else bool(ai_enabled)
         if not enabled:
             return {}
-        api_key = config.ai_api_key
-        if not api_key:
-            return {}
-
-        base_url = config.chat_ai_base_url
-        primary_model = config.chat_ai_model
-        fallback_models = config.chat_ai_fallback_models
-        models = []
-        if primary_model:
-            models.append(primary_model)
-        for m in fallback_models:
-            if m and m not in models:
-                models.append(m)
-        if not models:
-            return {}
 
         compact_questions = [{
             'id': q.get('id'),
@@ -629,64 +626,34 @@ class SitemapGenerator:
             "Propose 3-5 improved options per question. Return JSON mapping question_id -> array of strings."
         )
 
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-            'HTTP-Referer': config.ai_http_referer,
-            'X-Title': config.ai_app_name
-        }
+        req = CompletionRequest(
+            prompt=user_msg,
+            system_instruction=system_msg,
+            temperature=0.1,
+            max_tokens=256,
+            response_format={"type": "json_object"},
+            timeout_seconds=10
+        )
+        resp = execute_completion_with_fallback(req)
+        if not resp.success:
+            self.last_ai_error = resp.error_message
+            return {}
 
-        deadline = time.monotonic() + 10.0
-        for model in models:
-            if time.monotonic() > deadline:
-                break
-            try:
-                payload = json.dumps({
-                    'model': model,
-                    'messages': [{'role': 'system', 'content': system_msg}, {'role': 'user', 'content': user_msg}],
-                    'temperature': 0.1,
-                    'max_tokens': 128
-                }).encode('utf-8')
-                req = urllib.request.Request(base_url, data=payload, headers=headers, method='POST')
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    raw = resp.read().decode('utf-8')
-                data = json.loads(raw)
-                content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-                cleaned = _parse_ai_json(content)
-                if cleaned:
-                    return _filter_options_by_context(cleaned)
-            except urllib.error.HTTPError as e:
-                self.last_ai_error = f"HTTP {e.code}: {e.reason}"
-                if e.code == 402: continue # Try next model if credits out
-            except Exception as e:
-                self.last_ai_error = str(e)
-                continue
+        parsed_json = resp.parse_as_json()
+        if not parsed_json and resp.content:
+            parsed_json = _parse_ai_json(resp.content)
+        if parsed_json:
+            cleaned = _parse_ai_json(json.dumps(parsed_json) if not isinstance(parsed_json, str) else parsed_json)
+            if cleaned:
+                return _filter_options_by_context(cleaned)
         return {}
 
     def _ai_extract_brief(self, prompt: str) -> Dict[str, Any]:
         self.last_ai_error = None
-        enabled = config.chat_ai_enabled
-        if not enabled:
-            return {}
-        api_key = config.ai_api_key
-        if not api_key:
+        if not config.chat_ai_enabled:
             return {}
 
-        base_url = config.chat_ai_base_url
-        primary_model = config.chat_ai_model
-        fallback_models = config.chat_ai_fallback_models
-        models = []
-        if primary_model:
-            models.append(primary_model)
-        for m in fallback_models:
-            if m and m not in models:
-                models.append(m)
-        if not models:
-            return {}
-
-        system_msg = (
-            "Extract a structured brief from a website prompt. Return JSON only."
-        )
+        system_msg = "Extract a structured brief from a website prompt. Return JSON only."
         user_msg = (
             "Rules:\n"
             "- Return a JSON object with keys: type, pages, services, features, goals, style, tone, language, showcase.\n"
@@ -697,87 +664,52 @@ class SitemapGenerator:
             f"Prompt:\n{prompt}"
         )
 
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-            'HTTP-Referer': config.ai_http_referer,
-            'X-Title': config.ai_app_name
-        }
+        req = CompletionRequest(
+            prompt=user_msg,
+            system_instruction=system_msg,
+            temperature=0.1,
+            max_tokens=256,
+            response_format={"type": "json_object"},
+            timeout_seconds=12
+        )
+        resp = execute_completion_with_fallback(req)
+        if not resp.success:
+            self.last_ai_error = resp.error_message
+            return {}
 
-        deadline = time.monotonic() + 8.0
-
-        for model in models:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return {}
-            payload = json.dumps({
-                'model': model,
-                'messages': [
-                    {'role': 'system', 'content': system_msg},
-                    {'role': 'user', 'content': user_msg}
-                ],
-                'temperature': 0.1,
-                'top_p': 0.9,
-                'max_tokens': 96
-            }).encode('utf-8')
-
-            req = urllib.request.Request(
-                base_url,
-                data=payload,
-                headers=headers,
-                method='POST'
-            )
-
+        parsed_json = resp.parse_as_json()
+        if not parsed_json and resp.content:
+            content = self._strip_code_fences(resp.content)
             try:
-                timeout = max(3, min(8, remaining))
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
-                    raw = resp.read().decode('utf-8')
-                data = json.loads(raw)
-                content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-                content = self._strip_code_fences(content)
-                if not content:
-                    continue
-                try:
-                    parsed_json = json.loads(content)
-                except json.JSONDecodeError:
-                    start = content.find('{')
-                    end = content.rfind('}')
-                    if start != -1 and end != -1 and end > start:
-                        parsed_json = json.loads(content[start:end + 1])
-                    else:
-                        continue
-                if not isinstance(parsed_json, dict):
-                    continue
-                cleaned: Dict[str, Any] = {}
-                for key, value in parsed_json.items():
-                    if key == 'pages':
-                        if isinstance(value, list):
-                            cleaned['pages'] = [str(v).strip() for v in value if str(v).strip()]
-                        elif isinstance(value, str):
-                            parts = [p.strip() for p in re.split(r'[,\|/;]| and ', value, flags=re.IGNORECASE) if p.strip()]
-                            if parts:
-                                cleaned['pages'] = parts
-                        continue
-                    if isinstance(value, list):
-                        cleaned[key] = [str(v).strip() for v in value if str(v).strip()]
-                        continue
-                    if isinstance(value, str):
-                        cleaned[key] = value.strip()
-                if cleaned:
-                    return cleaned
-            except urllib.error.HTTPError as e:
-                try:
-                    body = e.read().decode('utf-8')
-                except Exception:
-                    body = ''
-                self.last_ai_error = f"HTTP {e.code}: {body or e.reason}"
-                continue
-            except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
-                self.last_ai_error = str(e)
-                continue
+                parsed_json = json.loads(content)
             except Exception:
+                start = content.find('{')
+                end = content.rfind('}')
+                if start != -1 and end != -1 and end > start:
+                    try:
+                        parsed_json = json.loads(content[start:end + 1])
+                    except Exception:
+                        pass
+
+        if not isinstance(parsed_json, dict):
+            return {}
+
+        cleaned: Dict[str, Any] = {}
+        for key, value in parsed_json.items():
+            if key == 'pages':
+                if isinstance(value, list):
+                    cleaned['pages'] = [str(v).strip() for v in value if str(v).strip()]
+                elif isinstance(value, str):
+                    parts = [p.strip() for p in re.split(r'[,\|/;]| and ', value, flags=re.IGNORECASE) if p.strip()]
+                    if parts:
+                        cleaned['pages'] = parts
                 continue
-        return {}
+            if isinstance(value, list):
+                cleaned[key] = [str(v).strip() for v in value if str(v).strip()]
+                continue
+            if isinstance(value, str):
+                cleaned[key] = value.strip()
+        return cleaned
 
     def _merge_missing_fields(self, base: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(base, dict):
@@ -798,21 +730,6 @@ class SitemapGenerator:
         """Use AI to generate section lists for each page. Returns mapping page_name -> sections."""
         self.last_ai_error = None
         if not config.chat_ai_enabled:
-            return {}
-        api_key = config.ai_api_key
-        if not api_key:
-            return {}
-
-        base_url = config.chat_ai_base_url
-        primary_model = config.chat_ai_model
-        fallback_models = config.chat_ai_fallback_models
-        models = []
-        if primary_model:
-            models.append(primary_model)
-        for m in fallback_models:
-            if m and m not in models:
-                models.append(m)
-        if not models:
             return {}
 
         brief_context = {
@@ -836,76 +753,50 @@ class SitemapGenerator:
             f"Brief:\n{json.dumps(brief_context, ensure_ascii=True)}"
         )
 
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-            'HTTP-Referer': config.ai_http_referer,
-            'X-Title': config.ai_app_name
-        }
+        req = CompletionRequest(
+            prompt=user_msg,
+            system_instruction=system_msg,
+            temperature=0.2,
+            max_tokens=1000,
+            response_format={"type": "json_object"},
+            timeout_seconds=25
+        )
+        resp = execute_completion_with_fallback(req)
+        if not resp.success:
+            self.last_ai_error = resp.error_message
+            return {}
 
-        for model in models:
-            payload = json.dumps({
-                'model': model,
-                'messages': [
-                    {'role': 'system', 'content': system_msg},
-                    {'role': 'user', 'content': user_msg}
-                ],
-                'temperature': 0.2,
-                'top_p': 0.9,
-                'max_tokens': 700
-            }).encode('utf-8')
-
-            req = urllib.request.Request(
-                base_url,
-                data=payload,
-                headers=headers,
-                method='POST'
-            )
-
+        parsed_json = resp.parse_as_json()
+        if not parsed_json and resp.content:
             try:
-                with urllib.request.urlopen(req, timeout=20) as resp:
-                    raw = resp.read().decode('utf-8')
-                data = json.loads(raw)
-                content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-                content = self._strip_code_fences(content)
-                if not content:
-                    continue
-                parsed_json = json.loads(content)
-                if not isinstance(parsed_json, dict):
-                    continue
-                cleaned: Dict[str, List[Dict[str, Any]]] = {}
-                for page_name, sections in parsed_json.items():
-                    if not isinstance(sections, list):
-                        continue
-                    cleaned_sections: List[Dict[str, Any]] = []
-                    for s in sections:
-                        if not isinstance(s, dict):
-                            continue
-                        title = str(s.get('title', '')).strip()
-                        description = str(s.get('description', '')).strip()
-                        type_ = str(s.get('type', '')).strip() or 'content'
-                        if not title:
-                            continue
-                        cleaned_sections.append({
-                            'type': type_,
-                            'title': title,
-                            'description': description
-                        })
-                    if cleaned_sections:
-                        cleaned[page_name] = cleaned_sections
-                if cleaned:
-                    return cleaned
-            except urllib.error.HTTPError as e:
-                try:
-                    body = e.read().decode('utf-8')
-                except Exception:
-                    body = ''
-                self.last_ai_error = f"HTTP {e.code}: {body or e.reason}"
+                parsed_json = json.loads(self._strip_code_fences(resp.content))
+            except Exception:
+                pass
+
+        if not isinstance(parsed_json, dict):
+            return {}
+
+        cleaned: Dict[str, List[Dict[str, Any]]] = {}
+        for page_name, sections in parsed_json.items():
+            if not isinstance(sections, list):
                 continue
-            except Exception as e:
-                self.last_ai_error = str(e)
-                continue
-        return {}
+            cleaned_sections: List[Dict[str, Any]] = []
+            for s in sections:
+                if not isinstance(s, dict):
+                    continue
+                title = str(s.get('title', '')).strip()
+                description = str(s.get('description', '')).strip()
+                type_ = str(s.get('type', '')).strip() or 'content'
+                if not title:
+                    continue
+                cleaned_sections.append({
+                    'type': type_,
+                    'title': title,
+                    'description': description
+                })
+            if cleaned_sections:
+                cleaned[page_name] = cleaned_sections
+        return cleaned
 
     def _clean_page_name(self, name: str) -> str:
         cleaned = re.sub(r'\s+', ' ', name.strip())
@@ -1161,6 +1052,11 @@ class SitemapGenerator:
 
     def parse_prompt(self, prompt: str) -> Dict[str, Any]:
         """Parse a freeform prompt into a structured brief."""
+        if hasattr(self, 'analyzer') and self.analyzer:
+            parsed = self.analyzer.analyze(prompt)
+            self.last_ai_error = self.analyzer.last_ai_error
+            return parsed
+
         text = (prompt or "").strip()
         if not text:
             return {}
@@ -2077,6 +1973,11 @@ class SitemapGenerator:
 
     def generate_sitemap(self, prompt: str, brief_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Generate sitemap from natural language prompt or structured brief data"""
+        if hasattr(self, 'service') and self.service:
+            res = self.service.generate_sitemap(prompt, brief_data)
+            self.last_ai_error = self.service.last_ai_error
+            return res
+
         normalized = self._normalize_brief(prompt, brief_data)
         if isinstance(normalized, dict):
             normalized['prompt_text'] = prompt or ''
@@ -2139,7 +2040,7 @@ class SitemapGenerator:
         # AI-driven section generation with heuristic fallback when AI fails.
         if pages:
             sections_map = {}
-            if config.chat_ai_enabled and config.ai_api_key:
+            if config.chat_ai_enabled:
                 sections_map = self._ai_generate_sections_map(prompt, normalized or {}, pages)
 
             def apply_sections(nodes: List[Dict[str, Any]]):
@@ -2178,6 +2079,11 @@ class SitemapGenerator:
 
     def generate_questions_for_brief(self, prompt: str, ai_enabled: Any = None) -> List[Dict]:
         """Generate customized questions with dynamic options based on initial prompt analysis"""
+        if hasattr(self, 'analyzer') and self.analyzer:
+            parsed = self.analyzer.analyze(prompt, ai_enabled=ai_enabled)
+            self.last_ai_error = self.analyzer.last_ai_error
+            return self.analyzer.generate_brief_questions(prompt, parsed)
+
         parsed = self.parse_prompt(prompt)
         prompt_lower = (prompt or '').lower()
         website_type = parsed.get('type') or self._determine_website_type(prompt_lower)
@@ -2233,7 +2139,7 @@ class SitemapGenerator:
         ai_options = self._ai_suggest_options(prompt, questions, parsed, ai_enabled)
         # AI retry + lightweight inference pass: if AI returns nothing (or mostly empty),
         # run a brief extraction and merge missing fields so we avoid generic fallbacks.
-        if (not ai_options or len([k for k, v in ai_options.items() if v]) < max(1, len(questions) // 3)) and config.chat_ai_enabled and config.ai_api_key:
+        if (not ai_options or len([k for k, v in ai_options.items() if v]) < max(1, len(questions) // 3)) and config.chat_ai_enabled:
             ai_brief = self._ai_extract_brief(prompt)
             if ai_brief:
                 parsed = self._merge_missing_fields(parsed, ai_brief)
@@ -2690,6 +2596,9 @@ class SitemapGenerator:
 class WireframeGenerator:
     """Service class for generating wireframes from sitemap data"""
 
+    def __init__(self, ai_provider=None):
+        self.service = WireframeService(ai_provider=ai_provider)
+
     def _get_brief_context(self, sitemap_data: Dict[str, Any]) -> Dict[str, Any]:
         brief = sitemap_data.get('brief') if isinstance(sitemap_data, dict) else {}
         if not isinstance(brief, dict):
@@ -3141,45 +3050,18 @@ class WireframeGenerator:
 
         return normalized
     
-    def generate_wireframes(self, sitemap_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate wireframes for each page in the sitemap"""
-        wireframes = {}
-        
-        def process_pages(pages: List[Dict], parent_path: str = ""):
-            for page in pages:
-                page_path = f"{parent_path}/{page['name']}" if parent_path else page['name']
-                wireframes[page['id']] = self._generate_page_wireframe(page, page_path, sitemap_data)
-                
-                if page.get('children'):
-                    process_pages(page['children'], page_path)
-        
-        process_pages(sitemap_data.get('pages', []))
-        
-        return {
-            'website_type': sitemap_data.get('website_type', ''),
-            'brief': self._get_brief_context(sitemap_data),
-            'wireframes': wireframes
-        }
+    def generate_wireframes(self, sitemap_data: Dict[str, Any], page_id: str = None) -> Dict[str, Any]:
+        """Generate wireframes for each page in the sitemap using WireframeService"""
+        return self.service.generate_wireframes(sitemap_data, page_id=page_id)
 
     def _ai_generate_page_wireframe(self, page: Dict[str, Any], sitemap_data: Dict[str, Any]) -> List[Dict]:
-        """Uses the configured OpenRouter-compatible OpenAI client to generate a wireframe layout."""
+        """Uses the configured common AI provider to generate a wireframe layout."""
         if not config.chat_ai_enabled:
-            return []
-        api_key = config.ai_api_key
-        if not api_key or OpenAI is None:
-            return []
-
-        base_url = config.wireframe_ai_base_url or config.chat_ai_base_url
-        model = config.wireframe_ai_model or config.chat_ai_model
-        if not base_url or not model:
             return []
 
         page_name = page.get('name', 'Page')
         page_id = page.get('id', '')
         website_type = sitemap_data.get('website_type', 'Website')
-        normalized_base_url = base_url.rstrip('/')
-        if normalized_base_url.endswith('/chat/completions'):
-            normalized_base_url = normalized_base_url[:-len('/chat/completions')]
 
         pages = sitemap_data.get('pages', []) or []
         page_names = []
@@ -3246,34 +3128,40 @@ class WireframeGenerator:
         )
 
         try:
-            client = OpenAI(
-                base_url=normalized_base_url,
-                api_key=api_key,
-                default_headers={
-                    'HTTP-Referer': config.ai_http_referer,
-                    'X-Title': config.ai_app_name,
-                }
-            )
-
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {'role': 'system', 'content': system_msg},
-                    {'role': 'user', 'content': user_msg}
-                ],
+            req = CompletionRequest(
+                prompt=user_msg,
+                system_instruction=system_msg,
                 temperature=0.3,
-                max_tokens=1500,
-                extra_body={"reasoning": {"enabled": True}}
+                max_tokens=2048,
+                response_format={"type": "json_object"},
+                timeout_seconds=config.ai_timeout_seconds
             )
+            resp = execute_completion_with_fallback(req)
+            if not resp.success:
+                print(f"Wireframe AI generation failed: {resp.error_message}")
+                return []
 
-            content = response.choices[0].message.content or ''
+            parsed_json = resp.parse_as_json()
+            if not parsed_json and resp.content:
+                content = resp.content
+                if content.startswith('```'):
+                    content = content.replace('```json', '', 1)
+                    content = content.replace('```', '')
+                content = content.strip()
+                try:
+                    parsed_json = json.loads(content)
+                except Exception:
+                    start = content.find('[')
+                    end = content.rfind(']')
+                    if start != -1 and end != -1 and end > start:
+                        try:
+                            parsed_json = json.loads(content[start:end + 1])
+                        except Exception:
+                            pass
 
-            if content.startswith('```'):
-                content = content.replace('```json', '', 1)
-                content = content.replace('```', '')
-            content = content.strip()
+            if isinstance(parsed_json, dict) and 'sections' in parsed_json:
+                parsed_json = parsed_json['sections']
 
-            parsed_json = json.loads(content)
             if isinstance(parsed_json, list):
                 cleaned = []
                 for idx, s in enumerate(parsed_json):
@@ -3294,49 +3182,16 @@ class WireframeGenerator:
                         'menuItems': [str(item).strip() for item in s.get('menuItems', [])[:8] if str(item).strip()] if isinstance(s.get('menuItems'), list) else [],
                         'items': self._normalize_wireframe_items(s.get('items', []))
                     })
-                if cleaned and len(cleaned) == len(normalized_sections):
+                if cleaned:
                     return self._finalize_wireframe_sections(cleaned, page_context, sitemap_data)
         except Exception as e:
-            if 'localhost' in base_url or '127.0.0.1' in base_url:
-                print(f"Local wireframe model failed ({e}); falling back to sitemap-based sections.")
             print(f"Error in wireframe AI generation: {e}")
 
         return []
 
     def _generate_page_wireframe(self, page: Dict, page_path: str, sitemap_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate wireframe structure for a single page using AI layout logic and fallback to sitemap sections"""
-        page_name = page['name']
-        sitemap_data = sitemap_data or {}
-        
-        # 1. Try AI generation first
-        ai_sections = self._ai_generate_page_wireframe(page, sitemap_data)
-        if ai_sections:
-            return {
-                'page_name': page_name,
-                'page_path': page_path,
-                'sections': self._finalize_wireframe_sections(ai_sections, page, sitemap_data)
-            }
-
-        # 2. Fallback to sections provided from the sitemap (already mapped)
-        if 'sections' in page and page['sections']:
-            sections = []
-            for section in page['sections']:
-                sections.append({
-                    'id': section.get('id') or str(uuid.uuid4())[:8],
-                    'type': section.get('type', 'content'),
-                    'title': section.get('title', 'Section'),
-                    'description': section.get('description', ''),
-                    'layoutVariant': section.get('layoutVariant', 'layout-default'),
-                    'buttonText': section.get('buttonText', ''),
-                    'menuItems': section.get('menuItems', []),
-                    'items': section.get('items', [])
-                })
-            
-            return {
-                'page_name': page['name'],
-                'page_path': page_path,
-                'sections': self._finalize_wireframe_sections(sections, page, sitemap_data)
-            }
+        """Generate wireframe structure for a single page using WireframeService"""
+        return self.service.generate_page_wireframe(page, page_path, sitemap_data)
 
 
 
@@ -3547,54 +3402,4 @@ class WireframeGenerator:
 
     def regenerate_section_description(self, title: str, section_type: str) -> str:
         """Provide a fresh, varied description for a section"""
-        import random
-        
-        # Variations based on type and title
-        variations = {
-            'navbar': [
-                "A clean, sticky navigation bar featuring your brand logo on the left and primary links (Home, Services, About, Contact) on the right. Includes a prominent CTA button for immediate user conversion.",
-                "Modern, transparent navigation bar that transitions to a solid background on scroll. Features drop-down menus for services and a search bar for easy site navigation.",
-                "Minimalist navigation structure with a centered logo and evenly spaced menu items. Optimized for mobile with a smooth-animating hamburger menu."
-            ],
-            'hero': [
-                f"Impactful hero section for {title} featuring a bold headline, a persuasive sub-headline that explains your unique value proposition, and two contrasting CTA buttons to guide user action.",
-                f"Dynamic hero area with a high-quality background video, a centered mission statement for {title}, and a scroll-down indicator to improve user flow.",
-                f"Visually striking hero header with a split layout: on the left, a benefit-driven headline for {title}; on the right, an interactive element or product showcase image."
-            ],
-            'features': [
-                "An elegant features grid showcasing 3 to 6 key benefits. Each item includes a modern icon, a snappy headline, and a 2-sentence description focusing on the 'why' behind each feature.",
-                "Side-by-side alternating feature blocks with large, illustrative images and detailed copy explaining how each capability solves a specific customer pain point.",
-                "Interactive feature tabs or accordion that allow users to explore different aspects of the service without leaving the current view."
-            ],
-            'services': [
-                f"A comprehensive services showcase for {title} using card-based design. Each card highlights a specific offering with price indicators, key deliverables, and a 'View Details' link.",
-                f"Service-focused layout for {title} featuring customer-centric descriptions, process steps (How it works), and integrated booking functionality.",
-                f"Minimalist service list with clean typography and hover effects that reveal deeper information about the specific offerings in {title}."
-            ],
-            'testimonial': [
-                "Single, high-impact testimonial section with a large quote from a key client, their professional headshot, and a link to a detailed case study.",
-                "Multi-card testimonial slider showcasing varied client success stories, complete with star ratings, verified badges, and company logos.",
-                "Social proof wall featuring a grid of customer tweets, video testimonials, and trust pilot ratings to build immediate credibility."
-            ],
-            'contact': [
-                "Minimalist contact section with a split screen: a simple, multi-step form on one side and direct contact details (email, phone, social) on the other.",
-                "Full-width interactive map showing your office location, paired with business hours and a 'Get Directions' button.",
-                "Conversational contact area using a large, friendly header and multiple contact options categorized by inquiry type (Support, Sales, Press)."
-            ],
-            'footer': [
-                "Informative footer organized into four columns: Company Info, Quick Links, Services, and Resources. Includes social icons and a newsletter signup field.",
-                "Minimalist footer with a centered logo, copyright notice, and essential legal links (Privacy Policy, Terms). Best for landing pages.",
-                "Feature-rich footer with a miniature site map, contact details, latest blog posts preview, and brand trust certifications."
-            ],
-            'content': [
-                f"A versatile content block for {title} incorporating a balanced mix of professional copy, bulleted lists for readability, and supporting visual elements.",
-                f"Detailed information section for {title} using a clean, multi-column layout to present complex data or stories in an easy-to-digest format.",
-                f"Engagement-focused content area for {title} with a prominent section header, explanatory text, and a context-specific call to action."
-            ]
-        }
-        
-        # Get list of variations for the type, default to 'content' if type not found
-        options = variations.get(section_type, variations['content'])
-        
-        # Return a random variation
-        return random.choice(options)
+        return self.service.regenerate_section_description(title, section_type)

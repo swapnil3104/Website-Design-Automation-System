@@ -8,5 +8,6 @@ urlpatterns = [
     path('export-json/', views.export_json, name='export_json'),
     path('generate-wireframe/', views.generate_wireframe, name='generate_wireframe'),
     path('regenerate-section/', views.regenerate_section, name='regenerate_section'),
+    path('evaluate-quality/', views.evaluate_quality, name='evaluate_quality'),
     path('config/', views.get_config, name='get_config'),
 ]
